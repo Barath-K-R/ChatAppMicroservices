@@ -189,10 +189,6 @@ export const getChatsByUserIdAndType = async (userId, type) => {
                     },
                 },
                 include: [
-                    // {
-                    //     model: UserModel,
-                    //     attributes: ["id", "username"],
-                    // },
                     {
                         model: ChatModel,
                         where: {
@@ -223,7 +219,7 @@ export const getChatsByUserIdAndType = async (userId, type) => {
                 },
             });
         }
-
+        console.log(chats);
         return chats;
     } catch (error) {
         console.error("Error fetching chats by user ID and type:", error);

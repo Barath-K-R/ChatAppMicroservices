@@ -5,22 +5,31 @@ import { subscribeEvents } from '../services/threadService.js';
 dotenv.config();
 
 
-let channel=null;
+let channel = null;
 
 export const createChannel = async () => {
-    if (channel) {
-        return channel; 
-    }
+    if (channel) return channel;
+
 
     try {
         const connection = await amqplib.connect(process.env.MSG_QUEUE_URL);
         channel = await connection.createChannel();
-        
-       
+
+
         await channel.assertExchange(process.env.EXCHANGE_NAME, "direct", { durable: true });
-        await channel.assertQueue('thread_queue', { exclusive: true }); 
+        await channel.assertQueue('thread_queue', { exclusive: true });
         await channel.bindQueue('thread_queue', process.env.EXCHANGE_NAME, 'message_found');
-        
+
+        connection.on('close', () => {
+            console.error('RabbitMQ connection closed.');
+            channel = null;
+        });
+
+        connection.on('error', (err) => {
+            console.error('RabbitMQ connection error:', err);
+            channel = null;
+        });
+
         return channel;
     } catch (err) {
         console.error("Error creating channel:", err);
@@ -43,7 +52,7 @@ export const publishMessage = async (routingKey, message) => {
             Buffer.from(JSON.stringify(message)),
             { persistent: true }
         );
-        console.log("Message sent successfully "+routingKey);
+        console.log("Message sent successfully " + routingKey);
     } catch (error) {
         console.error('Error publishing message:', error);
         throw error;
@@ -51,15 +60,15 @@ export const publishMessage = async (routingKey, message) => {
 };
 
 export const SubscribeMessage = async () => {
-    const channel = await createChannel();  
+    const channel = await createChannel();
 
-   
+
     channel.consume(
         'thread_queue',
         (msg) => {
             if (msg && msg.content) {
-                subscribeEvents(msg);  
-                channel.ack(msg);  
+                subscribeEvents(msg);
+                channel.ack(msg);
             }
         },
         { noAck: false }

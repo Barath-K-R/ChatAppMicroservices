@@ -3,16 +3,23 @@ import amqplib from 'amqplib';
 let channel;
 
 const createChannel = async () => {
-  if (channel) {
-    return channel;
-  }
+  if (channel) return channel;
   try {
     const connection = await amqplib.connect(process.env.MSG_QUEUE_URL);
     channel = await connection.createChannel();
 
     await channel.assertExchange(process.env.EXCHANGE_NAME, 'direct', { durable: true });
 
-    
+    connection.on('close', () => {
+      console.error('RabbitMQ connection closed.');
+      channel = null;
+    });
+
+    connection.on('error', (err) => {
+      console.error('RabbitMQ connection error:', err);
+      channel = null;
+    });
+
     return channel;
 
   } catch (error) {
@@ -22,7 +29,7 @@ const createChannel = async () => {
 };
 
 const publishMessage = async (routingKey, message) => {
-  const channel=await createChannel()
+  const channel = await createChannel()
   try {
     await channel.publish(
       process.env.EXCHANGE_NAME,

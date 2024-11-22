@@ -2,8 +2,8 @@ import * as userService from "../services/userService.js";
 
 
 const UserController = (app) => {
-  
-  app.post("/users", async (req, res) => {
+
+  app.post("/", async (req, res) => {
     const { username, email, password } = req.body;
     try {
       const newUser = await userService.addUser({ username, email, password });
@@ -17,7 +17,7 @@ const UserController = (app) => {
     }
   });
 
-  app.get("/users/ids", async (req, res) => {
+  app.get("/ids", async (req, res) => {
     console.log('finding userids');
     const { userIds } = req.body;
     try {
@@ -32,7 +32,7 @@ const UserController = (app) => {
     }
   });
 
-  app.get("/users/:id", async (req, res) => {
+  app.get("/:id", async (req, res) => {
     const { id } = req.params;
     try {
       const user = await userService.getUserById(id);
@@ -52,7 +52,7 @@ const UserController = (app) => {
 
 
 
-  app.get("/users/org/:orgId", async (req, res) => {
+  app.get("/org/:orgId", async (req, res) => {
     const { orgId } = req.params;
     try {
       const users = await userService.getAllOrgUsers(orgId);
@@ -66,7 +66,7 @@ const UserController = (app) => {
     }
   });
 
-  app.post("/users/login", async (req, res) => {
+  app.post("/login", async (req, res) => {
     const { username, password } = req.body;
     try {
       const result = await userService.login({ username, password });
@@ -77,7 +77,8 @@ const UserController = (app) => {
     }
   });
 
-  app.post("/users/logout", async (req, res) => {
+  app.post("/logout", async (req, res) => {
+    console.log(req.body);
     const { userId } = req.body;
     try {
       const result = await userService.logout(userId);
@@ -88,19 +89,19 @@ const UserController = (app) => {
     }
   });
 
-  app.post("/users/refresh", async (req, res) => {
+  app.post("/refresh", async (req, res) => {
     console.log('refreshing');
     const { refreshToken } = req.body;
     try {
       const result = await userService.createAccessToken(refreshToken);
-      res.status(200).json({accessToken:result});
+      res.status(200).json({ accessToken: result });
     } catch (error) {
       console.error("Error creating access token:", error);
       res.status(500).json({ message: "An error occurred while creating a new access token." });
     }
   });
 
-  app.post("/users/join-org", async (req, res) => {
+  app.post("/join-org", async (req, res) => {
     const { userId, organizationId } = req.body;
 
     try {

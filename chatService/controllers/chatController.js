@@ -1,7 +1,7 @@
 import * as chatService from '../services/chatService.js';
 
 const chatController = (app) => {
-  app.post("/chat", async (req, res) => {
+  app.post("/", async (req, res) => {
     const { currentUserId, userIds, chatType, name, description, visibility, scope } = req.body;
     try {
       const result = await chatService.createChat(currentUserId, userIds, chatType, name, description, visibility, scope);
@@ -12,7 +12,7 @@ const chatController = (app) => {
     }
   });
 
-  app.get("/chat/:userId", async (req, res) => {
+  app.get("/:userId", async (req, res) => {
     console.log(req.params);
     const { userId } = req.params;
     const { type } = req.query;
@@ -28,7 +28,7 @@ const chatController = (app) => {
     }
   });
 
-  app.delete("/chat/:chatId", async (req, res) => {
+  app.delete("/:chatId", async (req, res) => {
     const { chatId } = req.params;
     try {
       const result = await chatService.deleteChat(chatId);
@@ -39,7 +39,7 @@ const chatController = (app) => {
     }
   });
 
-  app.get("/chat/:chatId/members", async (req, res) => {
+  app.get("/:chatId/members", async (req, res) => {
     const { chatId } = req.params;
     try {
       const members = await chatService.getChatMembers(chatId);
@@ -50,7 +50,7 @@ const chatController = (app) => {
     }
   });
 
-  app.post("/chat/:chatId/members", async (req, res) => {
+  app.post("/:chatId/members", async (req, res) => {
     const { chatId } = req.params;
     const { userIds } = req.body;
     try {
@@ -62,7 +62,7 @@ const chatController = (app) => {
     }
   });
 
-  app.delete("/chat/:chatId/members", async (req, res) => {
+  app.delete("/:chatId/members", async (req, res) => {
     const { chatId } = req.params;
     const { userIds } = req.body;
     try {
@@ -74,9 +74,9 @@ const chatController = (app) => {
     }
   });
 
-  app.post("/chat/:chatId/permissions", async (req, res) => {
+  app.post("/:chatId/permissions", async (req, res) => {
     const { chatId } = req.params;
-    const {roles }= req.body;
+    const { roles } = req.body;
     try {
       const result = await chatService.addRolePermissions(chatId, roles);
       res.status(200).json(result);
@@ -86,7 +86,7 @@ const chatController = (app) => {
     }
   });
 
-  app.get("/chat/:chatId/permissions", async (req, res) => {
+  app.get("/:chatId/permissions", async (req, res) => {
     const { chatId } = req.params;
     try {
       const rolePermissions = await chatService.getAllRolePermissions(chatId);
@@ -97,7 +97,7 @@ const chatController = (app) => {
     }
   });
 
-  app.get("/chat/:chatId/permissions/:roleId", async (req, res) => {
+  app.get("/:chatId/permissions/:roleId", async (req, res) => {
     const { chatId, roleId } = req.params;
     try {
       const permissions = await chatService.getRolePermissions(chatId, roleId);
@@ -108,7 +108,7 @@ const chatController = (app) => {
     }
   });
 
-  app.delete("/chat/:chatId/leave/:userId", async (req, res) => {
+  app.delete("/:chatId/leave/:userId", async (req, res) => {
     const { chatId, userId } = req.params;
     try {
       await chatService.leaveChat(chatId, userId);

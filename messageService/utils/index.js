@@ -8,20 +8,28 @@ dotenv.config()
 let channel = null;
 
 export const createChannel = async () => {
-  if (channel) {
-    return channel;
-  }
+  if(channel) return channel;
 
   try {
     const connection = await amqplib.connect(process.env.MSG_QUEUE_URL);
     channel = await connection.createChannel();
 
-    // Declare exchange and queues
     await channel.assertExchange(process.env.EXCHANGE_NAME, "direct", { durable: true });
     await channel.assertQueue('message_queue', { durable: true }); 
     await channel.bindQueue('message_queue', process.env.EXCHANGE_NAME, 'message_find');
     await channel.bindQueue('message_queue', process.env.EXCHANGE_NAME, 'message_update');
     await channel.bindQueue('message_queue', process.env.EXCHANGE_NAME, 'message_create');
+
+
+    connection.on('close', () => {
+      console.error('RabbitMQ connection closed.');
+      channel = null; 
+    });
+
+    connection.on('error', (err) => {
+      console.error('RabbitMQ connection error:', err);
+      channel = null;
+    });
 
     return channel;
   } catch (err) {

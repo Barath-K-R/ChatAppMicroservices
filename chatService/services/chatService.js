@@ -59,7 +59,7 @@ export const getChatMembers = async (chatId) => {
         const userIds = chatMembers.map(member => member.user_id);
 
         if (userIds.length === 0) {
-            return { chatMembers };
+            return chatMembers;
         }
 
         let userDetails;
@@ -113,7 +113,7 @@ export const getChatMembers = async (chatId) => {
             };
         });
 
-        return { chatMembers: chatMembersWithUserDetails };
+        return chatMembersWithUserDetails;
 
     } catch (error) {
         console.error("Error fetching chat members:", error);
@@ -124,17 +124,16 @@ export const getChatMembers = async (chatId) => {
 
 export const getCurrentUserChats = async (userId, type) => {
     if (!type || !userId) {
-        return { error: "Missing required parameters" };
+        return [];
     }
 
     try {
         const chats = await chatRepository.getChatsByUserIdAndType(userId, type);
 
         const userIds = chats.map(chat => chat.user_id);
-        const response = { chats };
 
         if (userIds.length === 0 || type !== 'direct') {
-            return response;
+            return chats;
         }
 
         let userDetails;
@@ -178,7 +177,7 @@ export const getCurrentUserChats = async (userId, type) => {
         } catch (error) {
             console.error("Error fetching user details:", error);
         }
-        console.log(userDetails);
+
         const chatWithUserDetails = chats.map((chat) => {
             const user = userDetails?.find((user) => user.id === chat.user_id) || {};
             return {
@@ -336,7 +335,7 @@ export const getRolePermissions = async (chatId, roleId) => {
         const permissions = await chatRepository.getRolePermissionsFromRepo(chatId, roleId);
         if (!permissions.length) return { status: 404, error: "No permissions found for this role in the chat" };
 
-        return { permissions };
+        return permissions;
     } catch (error) {
         console.error("Error fetching role permissions:", error);
         return { error: "An error occurred while fetching role permissions." };
@@ -355,7 +354,7 @@ export const getAllRolePermissions = async (chatId) => {
             permission_name: item.Permission.name,
         }));
 
-        return { rolePermissions: flatResults };
+        return flatResults;
     } catch (error) {
         console.error("Error fetching role permissions:", error);
         return { error: "An error occurred while fetching permissions." };

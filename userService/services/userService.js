@@ -24,7 +24,7 @@ export const getUserById = async (id) => {
 
 export const getUsersByIds = async (userIds) => {
   try {
-    if (!userIds) throw new Error("userIds is required");
+    if (!userIds || userIds.length === 0) return [];
     const users = await userRepository.findUsersByIds(userIds);
     return users;
   } catch (error) {
@@ -160,7 +160,6 @@ export const subscribeEvents = async (msg) => {
           const userIds = messageContent;
           if (userIds && Array.isArray(userIds)) {
             const userDetails = await getUsersByIds(userIds);
-
             const { replyTo, correlationId } = msg.properties;
 
             const channel = await createChannel();

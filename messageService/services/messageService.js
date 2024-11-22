@@ -1,6 +1,7 @@
 import * as messageRepository from "../database/repositories/messageRepository.js";
 import * as readreceiptsRepository from "../database/repositories/readReceiptRepository.js";
 import { publishMessage, createChannel } from "../utils/index.js";
+import crypto from 'crypto'
 import dotenv from 'dotenv'
 
 dotenv.config()
@@ -20,26 +21,29 @@ export const addingMessage = async (chatId, sender_id, message, thread_id) => {
 export const getChatMessages = async (chatId) => {
   try {
     const messages = await messageRepository.getMessagesWithDetails(chatId);
-    const userIds = messages.map(message => message.dataValues.sender_id);
-
+    const userIds = messages.map((message) => message.dataValues.sender_id);
     const channel = await createChannel();
 
-    const responseQueue = await channel.assertQueue('message_response_queue', { durable: true });
 
-    await channel.bindQueue(responseQueue.queue, process.env.EXCHANGE_NAME, 'user_details_fetched');
+    const responseQueue = await channel.assertQueue('', { exclusive: true });
+    const correlationId = crypto.randomUUID();
 
-    const correlationId = generateUuid();
+    const responsePromise = new Promise((resolve, reject) => {
+      channel.consume(
+        responseQueue.queue,
+        (msg) => {
+          if (msg.properties.correlationId === correlationId) {
+            const data = JSON.parse(msg.content.toString());
+            resolve(data);
+            channel.ack(msg);
+          }
+        },
+        { noAck: false }
+      );
 
-    let userDetails;
-    channel.consume(
-      responseQueue.queue,
-      (msg) => {
-        if (msg.properties.correlationId === correlationId) {
-          userDetails = JSON.parse(msg.content.toString());
-        }
-      },
-      { noAck: true }
-    );
+      setTimeout(() => reject(new Error('Timeout waiting for user details')), 10000);
+    });
+
 
     channel.publish(
       process.env.EXCHANGE_NAME,
@@ -51,19 +55,7 @@ export const getChatMessages = async (chatId) => {
       }
     );
 
-    await new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        reject(new Error('Timeout waiting for user details'));
-      }, 10000);
-
-      const interval = setInterval(() => {
-        if (userDetails) {
-          clearTimeout(timeout);
-          clearInterval(interval);
-          resolve();
-        }
-      }, 100);
-    });
+    const userDetails = await responsePromise;
 
     const messagesWithUserDetails = messages.map((message) => {
       const userDetail = userDetails.find(
@@ -77,10 +69,12 @@ export const getChatMessages = async (chatId) => {
 
     return messagesWithUserDetails;
   } catch (error) {
-    console.error("Error fetching chat messages:", error);
-    throw new Error("An error occurred while fetching chat messages.");
+    console.error('Error fetching chat messages:', error);
+    throw new Error('An error occurred while fetching chat messages.');
   }
 };
+
+
 
 export const deleteChatMessages = async (chatId) => {
   try {
