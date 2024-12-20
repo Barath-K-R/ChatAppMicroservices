@@ -10,27 +10,45 @@ export const createThread = async (chatId, sender_id, head, userIds, message) =>
 
     if (head) {
         const channel = await createChannel();
-        const requestMessage = { messageId: head };
-        await publishMessage("message_find", requestMessage);
+        const responseQueue = await channel.assertQueue("", { exclusive: true });
+        const correlationId = generateUuid();
 
-        const response = await new Promise((resolve, reject) => {
-            channel.consume(
-                "thread_queue",
-                (msg) => {
-                    if (msg && msg.content) {
-                        const parsedMessage = JSON.parse(msg.content.toString());
-                        resolve(parsedMessage);
-                    }
-                },
-                { noAck: true }
-            );
+        channel.consume(
+            responseQueue.queue,
+            (msg) => {
+                if (msg.properties.correlationId === correlationId) {
+                    messageExists = JSON.parse(msg.content.toString());
+                }
+            },
+            { noAck: true }
+        );
+
+        // Publish the message find request
+        channel.publish(
+            process.env.EXCHANGE_NAME,
+            "message_find",
+            Buffer.from(JSON.stringify({ messageId: head })),
+            {
+                replyTo: responseQueue.queue,
+                correlationId,
+            }
+        );
+
+        // Wait for the response or timeout
+        await new Promise((resolve, reject) => {
+            const timeout = setTimeout(() => reject(new Error("Timeout waiting for message find response")), 10000);
+            const interval = setInterval(() => {
+                if (messageExists !== true) {
+                    clearTimeout(timeout);
+                    clearInterval(interval);
+                    resolve();
+                }
+            }, 100);
         });
 
-        messageExists = response;
-    }
-
-    if (head && !messageExists) {
-        throw new Error("Head message not found.");
+        if (!messageExists) {
+            throw new Error("Head message not found.");
+        }
     }
 
     const thread = await threadRepository.createThread(chatId, head);
@@ -38,6 +56,7 @@ export const createThread = async (chatId, sender_id, head, userIds, message) =>
     const messageUpdate = {
         messageId: head,
         threadId: thread.id,
+        isThreadHead: true
     };
     await publishMessage("message_update", messageUpdate);
 
@@ -68,55 +87,10 @@ export const addMessageToThread = async (thread_id, sender_id, message, chatId) 
     return { message: "Thread message created successfully" };
 };
 
-export const convertThreadToChat = async (threadId, name, description, currentUserId) => {
-    const threadMembers = await threadRepository.getThreadMembersByThreadId(threadId);
-    const userIds = threadMembers.map((member) => member.user_id);
-
-    if (!userIds || userIds.length === 0) {
-        throw new Error("No members found in the thread.");
-    }
-
-    if (!userIds.includes(currentUserId)) {
-        userIds.push(currentUserId);
-    }
-
-    const newChatData = {
-        currentUserId,
-        userIds,
-        chatType: "group",
-        name,
-        description,
-    };
-
-    const response = await axios.post("http://localhost:5000/chat", newChatData); // Ensure correct URL
-
-    const newChat = response.data.newChat;
-
-    await threadRepository.deleteThread(threadId);
-
-    return {
-        newChat,
-        message: "Thread has been successfully converted to a chat",
-    };
+const generateUuid = () => {
+    return (
+        Math.random().toString(36).substring(2, 10) +
+        Date.now().toString(36)
+    );
 };
 
-
-export const subscribeEvents = async (msg) => {
-    try {
-        if (msg && msg.content) {
-            const messageContent = JSON.parse(msg.content.toString());
-            const routingKey = msg.fields.routingKey;
-
-            const { messageId } = messageContent;
-            switch (routingKey) {
-                case 'message_found':
-
-                    break;
-                default:
-                    console.log(`Unhandled routing key: ${routingKey}`);
-            }
-        }
-    } catch (error) {
-        console.error("Error handling event:", error);
-    }
-};

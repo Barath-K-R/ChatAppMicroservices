@@ -13,9 +13,9 @@ const MessageModel = sequelize.define(
       type: DataTypes.INTEGER,
       allowNull: false,
     },
-    thread_id:{
-      type:DataTypes.INTEGER,
-      allowNull:true,
+    thread_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
     },
     sender_id: {
       type: DataTypes.INTEGER,
@@ -26,6 +26,21 @@ const MessageModel = sequelize.define(
       allowNull: false,
     },
     is_thread_head: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false,
+    },
+    forwardedFromMessageId: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      references: {
+        model: "Messages",
+        key: "id",
+      },
+      onDelete: "SET NULL",
+      onUpdate: "CASCADE",
+    },
+    isForwarded: {
       type: DataTypes.BOOLEAN,
       allowNull: false,
       defaultValue: false,

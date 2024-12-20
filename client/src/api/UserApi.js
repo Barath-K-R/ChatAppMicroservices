@@ -72,4 +72,6 @@ userApi.interceptors.response.use(
 export const getUser = (id) => userApi.get(`/${id}`);
 export const getAllOrgUser = (orgId) => userApi.get(`/org/${orgId}`);
 
+export const joinOrganization=(orgData)=>userApi.post('/join-org',orgData)
+export const signUpUser=(formdata)=>userApi.post('/signup',formdata);
 export const loginUser = (formdata) => userApi.post("/login", formdata);

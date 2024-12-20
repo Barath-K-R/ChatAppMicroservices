@@ -2,12 +2,27 @@ import amqplib from 'amqplib';
 import { subscribeEvents } from '../services/userService.js';
 
 let channel = null;
-
+let connection;
 
 export const createChannel = async () => {
   if (channel) return channel;
   try {
-    const connection = await amqplib.connect(process.env.MSG_QUEUE_URL);
+    if (!connection) {
+      connection = await amqplib.connect(process.env.MSG_QUEUE_URL);
+
+      connection.on("close", () => {
+        console.error("RabbitMQ connection closed. Reconnecting...");
+        connection = null;
+        channel = null;
+        setTimeout(createChannel, 5000);
+      });
+
+      connection.on("error", (err) => {
+        console.error("RabbitMQ connection error:", err);
+        connection = null;
+        channel = null;
+      });
+    }
     channel = await connection.createChannel();
 
 
@@ -18,16 +33,6 @@ export const createChannel = async () => {
 
     await channel.assertQueue('update_userorg_queue', { durable: true });
     await channel.bindQueue('update_userorg_queue', process.env.EXCHANGE_NAME, 'update_user_organization');
-
-    connection.on('close', () => {
-      console.error('RabbitMQ connection closed.');
-      channel = null;
-    });
-
-    connection.on('error', (err) => {
-      console.error('RabbitMQ connection error:', err);
-      channel = null;
-    });
 
     return channel;
   } catch (err) {

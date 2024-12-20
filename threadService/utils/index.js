@@ -1,41 +1,46 @@
 import amqplib from 'amqplib';
 import dotenv from 'dotenv';
-import { subscribeEvents } from '../services/threadService.js';
 
 dotenv.config();
 
 
 let channel = null;
 
+let connection;
+
 export const createChannel = async () => {
     if (channel) return channel;
 
-
     try {
-        const connection = await amqplib.connect(process.env.MSG_QUEUE_URL);
+        if (!connection) {
+            connection = await amqplib.connect(process.env.MSG_QUEUE_URL);
+
+            connection.on("close", () => {
+                console.error("RabbitMQ connection closed. Reconnecting...");
+                connection = null;
+                channel = null;
+                setTimeout(createChannel, 5000); 
+            });
+
+            connection.on("error", (err) => {
+                console.error("RabbitMQ connection error:", err);
+                connection = null;
+                channel = null;
+            });
+        }
+
         channel = await connection.createChannel();
-
-
         await channel.assertExchange(process.env.EXCHANGE_NAME, "direct", { durable: true });
-        await channel.assertQueue('thread_queue', { exclusive: true });
-        await channel.bindQueue('thread_queue', process.env.EXCHANGE_NAME, 'message_found');
-
-        connection.on('close', () => {
-            console.error('RabbitMQ connection closed.');
-            channel = null;
-        });
-
-        connection.on('error', (err) => {
-            console.error('RabbitMQ connection error:', err);
-            channel = null;
-        });
-
+        console.log("RabbitMQ channel created");
         return channel;
+
     } catch (err) {
         console.error("Error creating channel:", err);
+        channel = null;
         throw err;
     }
 };
+
 
 
 export const publishMessage = async (routingKey, message) => {
@@ -59,19 +64,4 @@ export const publishMessage = async (routingKey, message) => {
     }
 };
 
-export const SubscribeMessage = async () => {
-    const channel = await createChannel();
-
-
-    channel.consume(
-        'thread_queue',
-        (msg) => {
-            if (msg && msg.content) {
-                subscribeEvents(msg);
-                channel.ack(msg);
-            }
-        },
-        { noAck: false }
-    );
-};
 

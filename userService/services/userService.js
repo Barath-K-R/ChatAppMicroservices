@@ -14,7 +14,7 @@ export const addUser = async ({ username, email, password }) => {
 
 export const getUserById = async (id) => {
   try {
-    const user = await userRepository.findUserById(id);
+    const user = await userRepository.findByUserId(id);
     return user;
   } catch (error) {
     console.error("Error fetching user:", error);
@@ -25,7 +25,7 @@ export const getUserById = async (id) => {
 export const getUsersByIds = async (userIds) => {
   try {
     if (!userIds || userIds.length === 0) return [];
-    const users = await userRepository.findUsersByIds(userIds);
+    const users = await userRepository.findByUserIds(userIds);
     return users;
   } catch (error) {
     console.error("Error fetching users by IDs:", error);
@@ -43,30 +43,75 @@ export const getAllOrgUsers = async (orgId) => {
   }
 };
 
-export const joinOrganization = async (userId, orgId) => {
+
+export const joinOrganization = async (userId, orgName) => {
   try {
-    if (!orgId || !userId) {
-      throw new Error("Organization ID and User ID are required");
+    if (!orgName || !userId) {
+      throw { status: 400, message: "Invalid input: orgName and userId are required" };
+    }
+    let organization;
+
+    try {
+      const channel = await createChannel();
+      const responseQueue = await channel.assertQueue("", { exclusive: true });
+      const correlationId = generateUuid();
+
+      channel.consume(
+        responseQueue.queue,
+        (msg) => {
+          if (msg.properties.correlationId === correlationId) {
+            organization = JSON.parse(msg.content.toString());
+          }
+        },
+        { noAck: true }
+      );
+
+      channel.publish(
+        process.env.EXCHANGE_NAME,
+        "fetch_organization",
+        Buffer.from(JSON.stringify({ orgName })),
+        {
+          replyTo: responseQueue.queue,
+          correlationId,
+        }
+      );
+
+      await new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => reject(new Error("Timeout waiting for organization details")), 10000);
+        const interval = setInterval(() => {
+          if (organization) {
+            clearTimeout(timeout);
+            clearInterval(interval);
+            resolve();
+          }
+        }, 100);
+      });
+      console.log(organization);
+      if (!organization || organization.error) {
+        throw { status: 404, message: organization?.error || "Organization not found" };
+      }
+    } catch (error) {
+      console.log(error);
+      throw { status: 500, message: "Error fetching organization details via RabbitMQ" };
     }
 
-    const user = await userRepository.findUserById(userId)
-
+    const user = await userRepository.findByUserId(userId);
     if (!user) {
       throw { status: 404, message: "User not found" };
     }
 
-    user.organization_id = orgId;
-    await user.save();
+    await userRepository.updateUserOrganization(userId, organization.id)
 
-    return { message: "User successfully joined the organization", user };
+    const updatedUser = await userRepository.findByUserId(userId); 
+    
+    return updatedUser;
+
   } catch (error) {
-    if (!error.status) {
-      error.status = 500;
-      error.message = "An error occurred while joining the organization.";
-    }
+    console.error("Error joining organization:", error);
     throw error;
   }
 };
+
 
 export const updateUserOrganization = async (userId, organizationId) => {
   try {
@@ -83,9 +128,9 @@ export const updateUserOrganization = async (userId, organizationId) => {
   }
 };
 
-export const login = async ({ username, password }) => {
+export const login = async ({ identifier, password }) => {
   try {
-    const user = await userRepository.findUserByUsername(username);
+    const user = await userRepository.findUserByIdentifier(identifier);
     if (!user) throw new Error("User not found");
 
     const isMatch = user.password === password;
@@ -193,5 +238,12 @@ export const subscribeEvents = async (msg) => {
   } catch (error) {
     console.error("Error handling event:", error);
   }
+};
+
+const generateUuid = () => {
+  return (
+    Math.random().toString(36).substring(2, 10) +
+    Date.now().toString(36)
+  );
 };
 

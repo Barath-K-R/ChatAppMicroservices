@@ -73,6 +73,7 @@ export const createChat = (chatData) => chatApi.post("/", chatData);
 export const deleteChat=(chatId)=>chatApi.delete(`/${chatId}`)
 export const leaveChat=(chatId,userId)=>chatApi.delete(`/${chatId}/leave/${userId}`)
 
+export const getAllUserChats=(userId)=>chatApi.get(`/${userId}/all-chats`)
 export const userChats = (id, chatType) =>
   chatApi.get(`/${id}?type=${chatType}`);
 export const retrieveMembers = (chatId) =>
@@ -85,10 +86,14 @@ export const removeMembersFromChat = (chatId, userIds) =>
     data: { userIds },
   });
 
+export const getAllRoles=()=>chatApi.get('/roles')
 export const addRolePermissions=(chatId,permissions)=>chatApi.post(`/${chatId}/permissions`,permissions)
 export const getAllRolePermissions=(chatId)=>chatApi.get(`/${chatId}/permissions`);
 export const getRolePermissions = (chatId, roleId) =>
   chatApi.get(`/${chatId}/permissions/${roleId}`);
+export const updateRole = (chatId, userId, role) =>
+  chatApi.put(`/${chatId}/roles/${userId}`, { role });
+
 
 
 

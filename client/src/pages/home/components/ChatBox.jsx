@@ -4,7 +4,8 @@ import { CgLaptop, CgMailReply } from "react-icons/cg";
 import EmojiPicker, { EmojiStyle } from "emoji-picker-react";
 import { BsEmojiSmile } from "react-icons/bs";
 import { BsThreeDotsVertical } from "react-icons/bs";
-import { useSelector } from "react-redux";
+
+import { useSelector, useDispatch } from "react-redux";
 import { v4 as uuidv4 } from "uuid";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
@@ -13,17 +14,21 @@ import Message from "./Message.jsx";
 import MembersList from "./MembersList.jsx";
 import ChatSettings from "./ChatSettings.jsx";
 import ChatInfo from "./ChatInfo.jsx";
+import ForwardMessageModal from "./ForwardMessageModal.jsx";
+import PinMessageModal from "./PinMessageModal.jsx";
+
 
 import {
   retrieveMembers,
-  getRolePermissions,
-} from "../api/ChatApi";
-import {getMessages,addMessage,addReadReciept,updateReadReciepts} from '../api/messageApi.js'
-import { addMessageToThread,createThread} from "../api/threadApi.js";
+  getAllRolePermissions
+} from "../../../api/ChatApi.js";
+import { getMessages, addMessage, createReadReciept, updateReadReciepts } from '../../../api/messageApi.js'
+import { addMessageToThread, createThread } from "../../../api/threadApi.js";
 const ChatBox = ({
   chat,
+  chats,
+  socket,
   setChats,
-  setCurrentChat,
   chatType,
   setSendMessage,
   receivedMessage,
@@ -42,13 +47,21 @@ const ChatBox = ({
   const [replyThread, setreplyThread] = useState("");
   const [membersListModalOpened, setmembersListModalOpened] = useState(false);
   const [chatSettingsOpened, setchatSettingsOpened] = useState(false);
-  const [userPermissions, setUserPermissions] = useState([]);
-  const [currentUserChatDetails, setcurrentUserChatDetails] = useState(null);
   const [chatInfoModalOpened, setchatInfoModalOpened] = useState(false);
+  const [pinMessageModalOpen, setPinMessageModalOpen] = useState(false)
+  const [activeMessageId, setActiveMessageId] = useState(null);
 
   const messagesEndRef = useRef(null);
 
-  const currentUser = useSelector((state) => state.user.authUser);
+  const dispatch = useDispatch()
+  const userPermissions = useSelector(state => state.chats.chatPermissions)
+  const currentUser = useSelector(state => state.user.authUser);
+  const permissions = useSelector(state => state.chats.chatPermissions)
+  const currentUserRole = useSelector(state => state.chats.currentUserRole)
+  const isForwardMessageModalOpened = useSelector(state => state.forwardMessage.isForwardMessageModalOpened)
+  const forwardedMessage = useSelector(state => state.forwardMessage.forwardedMessage)
+  const currentChat = useSelector(state => state.chats.currentChat)
+  const pinnedMessages = useSelector(state => state.chats.pinnedMessages)
 
   const buildThreadMap = () => {
     const newThreadMap = {};
@@ -83,6 +96,7 @@ const ChatBox = ({
     }
   };
 
+
   const handleChange = (e) => {
     setNewMessage(e.target.value);
   };
@@ -95,20 +109,74 @@ const ChatBox = ({
       setcurrentThreadMessages([]);
     }
   };
-  //handling threadClick
-  const updateCurrentMessages = (mssg) => {
-    setcurrentThreadMessages(
-      messages.filter((message) => {
-        if (message.thread_id === mssg.thread_id && !message.is_thread_head)
-          return message;
-      })
-    );
-  };
+  
+
+  useEffect(() => {
+    if (expandedThreadHead) {
+      setcurrentThreadMessages(
+        messages.filter((message) => {
+          return message.thread_id === expandedThreadHead.thread_id && !message.is_thread_head;
+        })
+      );
+    }
+  }, [expandedThreadHead, messages]);
+  
 
   // Scroll to bottom function
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
+
+  //fetching chatpermissions 
+  useEffect(() => {
+    const fetchAllRolePermissions = async () => {
+      if (!currentChat || !currentChat.chat_id || !chatMembers || !currentUser)
+        return;
+
+
+      try {
+        console.log('sending gettting permissions')
+        const response = await getAllRolePermissions(currentChat.chat_id);
+        const data = response.data;
+        console.log(data)
+        const permissionsByRole = {
+          admin: [],
+          moderator: [],
+          member: [],
+        };
+
+        data.forEach((item) => {
+          const role = item.role_name.toLowerCase();
+          if (permissionsByRole[role]) {
+            permissionsByRole[role].push(item.permission_name);
+          }
+        });
+
+
+        dispatch({
+          type: "SET_CHAT_PERMISSIONS",
+          payload: permissionsByRole,
+        });
+
+        const currentUserRole = chatMembers.find(
+          (member) => member.user_id === currentUser.id
+        )?.Role.name;
+
+        if (currentUserRole) {
+          dispatch({
+            type: "SET_CURRENT_USER_ROLE",
+            payload: currentUserRole,
+          });
+        }
+      } catch (error) {
+        console.error("Error fetching permissions:", error);
+      }
+    };
+
+    if (currentChat.Chat.chat_type === 'channel')
+      fetchAllRolePermissions();
+  }, [currentChat, chatMembers]);
+
 
   // Scroll to bottom on new message
   useEffect(() => {
@@ -116,103 +184,76 @@ const ChatBox = ({
     buildThreadMap();
   }, [messages]);
 
-  //checking chat is group or direct,fetching messages,fetching chat Members,fetching role permissions
+  //checking chat is group or direct
   useEffect(() => {
-    const checkIfGroup = () => {
-      if (chat?.Chat?.name) setIsGroup(true);
-      else setIsGroup(false);
-    };
+    if (currentChat !== null) {
+      setIsGroup(!!currentChat?.Chat?.name);
+    }
+  }, [currentChat]);
 
+
+  // Fetch chat members
+  useEffect(() => {
     const getChatMembers = async () => {
-      try {
-        const response = await retrieveMembers(chat?.chat_id);
-        setchatMembers(response.data);
-      } catch (error) {
-        console.log("Error fetching chat members:", error);
+      if (currentChat !== null) {
+        try {
+          const response = await retrieveMembers(currentChat?.chat_id);
+          setchatMembers(response.data);
+          dispatch({ type: "SET_CHAT_MEMBERS", payload: response.data });
+        } catch (error) {
+          console.log("Error fetching chat members:", error);
+        }
       }
     };
+    getChatMembers();
+  }, [currentChat]);
 
+  // fetching chat Members,fetching role permissions
+  useEffect(() => {
     const fetchMessages = async () => {
       try {
-        console.log(chat?.chat_id);
-        
-        const { data } = await getMessages(chat?.chat_id);
-        console.log(data)
+        const { data } = await getMessages(currentChat?.chat_id);
         setMessages(data);
 
         const unseenMessages = data
-          .filter((message) => {
-            if (
-              message?.ReadReciepts?.length > 0 &&
-              message?.ReadReciepts[0]?.seen_at === null &&
+          .filter(
+            (message) =>
+              message?.ReadReciepts?.[0]?.seen_at === null &&
               message.sender_id !== currentUser.id
-            )
-              return message;
-          })
+          )
           .map((message) => message.id);
 
-        if (unseenMessages.length > 0) {
-          const updatedReadRecieptsResponse = await updateReadReciepts({
+        if (unseenMessages.length) {
+          await updateReadReciepts({
             messageIds: unseenMessages,
             userId: currentUser.id,
             date: Date.now(),
           });
         }
       } catch (error) {
-        console.log(error);
+        toast.error("Failed to fetch messages. Please try again.");
+        console.error("Fetch Messages Error:", error);
       }
     };
 
-    if (chat !== null) {
-      checkIfGroup();
-      getChatMembers();
-      fetchMessages();
-    }
-  }, [chat]);
+    fetchMessages();
 
-  //fetching rolepermissions
-  useEffect(() => {
-    const fetchRolePermissions = async () => {
-      try {
-        const currentUserDetails = chatMembers.find(
-          (member) => member.user_id === currentUser.id
-        );
+  }, [currentChat]);
 
-        const response = await getRolePermissions(
-          chat.chat_id,
-          currentUserDetails.role_id
-        );
-        console.log(response.data);
-        setUserPermissions(response.data);
-      } catch (error) {
-        console.log(error);
-        
-      }
-    };
-    chatMembers.forEach((member) => {
-      if (member.user_id === currentUser.id) setcurrentUserChatDetails(member);
-    });
-    fetchRolePermissions();
-  }, [chatMembers]);
+
 
   //handling sent messages
   const handleSend = async (e) => {
-    let hasSendMessagePermission = null;
-    if (currentUserChatDetails.Role.name === "admin") {
-      hasSendMessagePermission = true;
-    } else {
-      hasSendMessagePermission = userPermissions?.some(
-        permission=> permission.Permission.name === "send message"
-      );
-    }
 
-    if (!hasSendMessagePermission) {
+    if (currentChat.Chat.chat_type === 'channel' && !permissions[currentUserRole].includes("send message")) {
       toast.error("You do not have permission to send a message!", {
         position: "top-right",
       });
       return;
     }
 
+
+    //preparing message to send
     let threadId = null;
 
     if (replyThread === "new") {
@@ -240,16 +281,19 @@ const ChatBox = ({
             : null,
         },
       ],
-      // username: currentUser.username,
-      user: { username: currentUser.username },
+      User: { username: currentUser.username },
       sender_id: currentUser.id,
       message: replyThread !== "" ? replyMessage : newMessage,
       thread_id:
         replyThread === "old" ? expandedThreadHead.thread_id : threadId,
-      chatId: chat?.chat_id,
+      chatId: currentChat?.chat_id,
       chatType: chatType,
       is_thread_head: false,
+      forwardedMessage: forwardedMessage && Object.keys(forwardedMessage).length > 0 ? forwardedMessage : null,
+      isForwarded: forwardedMessage && Object.keys(forwardedMessage).length > 0,
     };
+
+    console.log(newMessageData)
 
     //updating the messages
     setMessages((prev) => [...prev, newMessageData]);
@@ -260,90 +304,120 @@ const ChatBox = ({
     }
 
     // send message to socket server
-    setSendMessage({ ...newMessageData, userIds });
+    setSendMessage({ ...newMessageData, userIds, headMessage: expandedThreadHead });
 
     // send message to backend
     try {
       let newMessageResponse = null;
-      if (replyThread === "")
+      if (replyThread === "") {
         newMessageResponse = await addMessage(newMessageData);
-      else if (replyThread === "old") {
+      }
 
-        console.log('old thread');
+      else if (replyThread === "old") {
+        console.log('old thread')
         newMessageResponse = await addMessageToThread(newMessageData);
-      } else {
-        
-        console.log('new thread');
+      } else if (replyThread === "new") {
+        console.log('new thread')
         newMessageResponse = await createThread({
           ...newMessageData,
           head: expandedThreadHead.id,
           userIds: [expandedThreadHead.sender_id, currentUser.id],
         });
         //changing the temporary thread_id with new Thread_id
-        setMessages((prevMessages) =>
-          prevMessages.map((message) =>
-            message.thread_id === threadId
-              ? { ...message, thread_id: newMessageResponse.thread_id }
-              : message
-          )
-        );
+        if (newMessageResponse && replyThread === 'new') {
+          setMessages((prevMessages) =>
+            prevMessages.map((message) =>
+              message.thread_id === threadId
+                ? { ...message, thread_id: newMessageResponse.thread_id }
+                : message
+            )
+          );
+        }
+
       }
 
       //creating read reciepts
-      const readRecieptResponse = await addReadReciept(
-        {
-          userIds: userIds,
-          date: onlineUsers.some((user) => user.userId === userIds[0])
-            ? createdAt
-            : null,
-        },
+      const readRecieptResponse = await createReadReciept(
+        userIds,
         newMessageResponse.data.id
       );
 
-      //resetting all newmessages
       setNewMessage("");
       setReplyMessage("");
+      setreplyThread("")
     } catch (error) {
       console.log(error);
     }
   };
 
-  // Receive Message from parent component
+  // Receive Message from socket server
   useEffect(() => {
-    if (receivedMessage && receivedMessage.chatId === chat?.chat_id) {
-      setMessages((prev) => [...prev, receivedMessage]);
-      if (
-        receivedMessage?.thread_id &&
-        expandedThreadHead?.thread_id &&
-        receivedMessage.thread_id === expandedThreadHead.thread_id
-      )
-        setcurrentThreadMessages((prev) => [...prev, receivedMessage]);
+    console.log('Received message', receivedMessage);
+  
+    if (receivedMessage) {
+      const { headMessage, chatId, thread_id } = receivedMessage;
+      const isCurrentChat = chatId === currentChat?.chat_id;
+  
+      if (isCurrentChat) {
+        setMessages((prev) => {
+          const updatedMessages = prev.map((message) =>
+            message.id === headMessage?.id
+              ? { ...message, is_thread_head: true, thread_id }
+              : message
+          );
+  
+          return [...updatedMessages, receivedMessage];
+        });
+        if (expandedThreadHead?.thread_id===thread_id) {
+          setcurrentThreadMessages((prev) => [...prev, receivedMessage]);
+        }
+      }
     }
-  }, [receivedMessage]);
+  }, [receivedMessage, currentChat?.chat_id]);
+  
 
-  const convertDateTime = (dateStr) => {
-    const date = new Date(dateStr);
+  //recieving reaction from socket server
+  useEffect(() => {
+    if (socket.current) {
+      socket.current.on("recieve-reaction", (reactionData) => {
+        console.log("Reaction received:", reactionData);
 
-    let hours = date.getHours();
-    const minutes = date.getMinutes();
-    const ampm = hours >= 12 ? "PM" : "AM";
+        setMessages((prevMessages) =>
+          prevMessages.map((msg) => {
+            if (msg.id === reactionData.messageId) {
+              return {
+                ...msg,
+                MessageReactions: [
+                  ...msg?.MessageReactions.filter(
+                    (reaction) => reaction.userId !== reactionData.userId
+                  ),
+                  {
+                    userId: reactionData.userId,
+                    reaction: reactionData.reaction,
+                    user: {
+                      username: reactionData.username
+                    }
+                  },
+                ],
+              };
+            }
+            return msg;
+          })
+        );
+      });
+    }
+  }, [socket]);
 
-    hours = hours % 12;
-    hours = hours ? hours : 12;
 
-    const minutesStr = minutes < 10 ? "0" + minutes : minutes;
 
-    const timeString = `${hours}:${minutesStr} ${ampm}`;
-    return timeString;
-  };
   return (
     <div className="flex flex-col relative h-screen w-full bg-slate-100 z-0">
       {/* Chat header */}
-      <div className="flex relative items-center justify-between h-12 border border-solid border-gray-500 shadow-sm bg-white p-4 px-6 gap-6">
+      <div className="flex relative items-center justify-between h-12 border border-solid border-gray-500 shadow-sm bg-white p-4 px-6 gap-6 z-50">
         <section className="flex items-center gap-6">
           <div className="flex justify-start items-center max-w-max h-10 cursor-pointer">
             <h1 className="font-semibold text-xl ">
-              {chat?.Chat?.name ? chat.Chat?.name : chat?.User?.username}
+              {currentChat?.Chat?.name ? currentChat.Chat?.name : currentChat?.User?.username}
             </h1>
           </div>
           <div
@@ -361,9 +435,10 @@ const ChatBox = ({
         >
           <BsThreeDotsVertical className="cursor-pointer" />
         </div>
-        {chatSettingsOpened && (
+
+        {chatSettingsOpened && chat.Chat.chat_type !== 'direct' && (
           <ChatSettings
-            chat={chat}
+            chat={currentChat}
             currentUser={currentUser}
             setchatSettingsOpened={setchatSettingsOpened}
             setchatInfoModalOpened={setchatInfoModalOpened}
@@ -371,21 +446,28 @@ const ChatBox = ({
         )}
       </div>
 
-      {/* chat info */}
+      {/* pinned messages modal */}
+      {pinnedMessages.length > 0 &&
+        <PinMessageModal
+          pinMessageModalOpen={pinMessageModalOpen}
+          setPinMessageModalOpen={setPinMessageModalOpen}
+          setActiveMessageId={setActiveMessageId}
+        />}
+
+      {/* chat info modal */}
       {chatInfoModalOpened && (
         <ChatInfo
-          currentChat={chat}
+          currentChat={currentChat}
           setChats={setChats}
-          setCurrentChat={setCurrentChat}
           setMessages={setMessages}
           setchatInfoModalOpened={setchatInfoModalOpened}
         />
       )}
 
-      {/* members list */}
+      {/* members list modal */}
       {membersListModalOpened && (
         <MembersList
-          chat={chat}
+          chat={currentChat}
           chatMembers={chatMembers}
           setchatMembers={setchatMembers}
           setmembersListModalOpened={setmembersListModalOpened}
@@ -394,22 +476,31 @@ const ChatBox = ({
       )}
 
       {/* Scrollable message display */}
-      <div className="flex-1 flex flex-col gap-2 bg-white p-2 pt-8 overflow-scroll">
+      <div className="message-display flex-1 flex flex-col gap-8 bg-white p-2 pt-8 overflow-auto custom-scrollbar">
         {messages.map((message, index) => {
           return (
             <div
-              className={`message flex flex-col hover:bg-gray-100 ${
-                message.is_thread_head &&
-                "border border-gray-300 shadow-lg rounded-lg cursor-pointer"
-              }`}
+              id={`message-${message.id}`}
+              className={`message-container flex flex-col ${message.is_thread_head &&
+                "border bg-gray-100 border-gray-300 shadow-lg rounded-lg cursor-pointer"
+                } ${activeMessageId === message.id &&
+                "animate-fadeOut border-orange-200"
+                }`}
+
+            // onClick={()=>{
+            //   updateExpandThreadHead(message)
+            //   updateCurrentThreadMessages(message)
+            // }}
             >
-              {(message.is_thread_head || !message.thread_id) && (
+              {/* Normal message */}
+              {(!message.thread_id || message.is_thread_head) && (
                 <Message
                   index={index}
                   message={message}
                   setMessages={setMessages}
                   currentUser={currentUser}
                   isGroup={isGroup}
+                  socket={socket}
                   setreplyThread={setreplyThread}
                   setExpandedThreadHead={setExpandedThreadHead}
                   messageActionIndex={messageActionIndex}
@@ -418,12 +509,12 @@ const ChatBox = ({
                   onThreadClick={() => {
                     if (message.is_thread_head) {
                       updateExpandThreadHead(message);
-                      updateCurrentMessages(message);
                     }
                   }}
                 />
               )}
 
+              {/* Thread messages */}
               {message.is_thread_head &&
                 expandedThreadHead?.id === message.id && (
                   <div className="flex flex-col m-2 mt-2">
@@ -431,6 +522,7 @@ const ChatBox = ({
                       <Message
                         key={threadMessage.id}
                         message={threadMessage}
+                        setMessages={setMessages}
                         currentUser={currentUser}
                         isGroup={isGroup}
                         expandedThreadHead={expandedThreadHead}
@@ -440,13 +532,15 @@ const ChatBox = ({
                     ))}
                   </div>
                 )}
+
+              {/* thread message input */}
               {message.is_thread_head &&
                 expandedThreadHead?.id === message.id &&
                 replyThread !== "" && (
                   <div className="border bottom-0 flex justify-evenly items-center focus:border-none focus:outline-none w-full h-18 bg-white p-4">
                     <input
                       type="text"
-                      className="h-8 w-10/12 rounded-md border border-blue-400 focus:outline-none p-2"
+                      className="h-8 w-10/12 rounded-md border border-blue-400 focus:out     line-none p-2"
                       value={replyMessage}
                       onChange={handleReplyChange}
                     />
@@ -459,6 +553,7 @@ const ChatBox = ({
                   </div>
                 )}
 
+              {/* thread message actions */}
               {message.is_thread_head && (
                 <>
                   <div className="line w-full h-[1px] bg-gray-200 block"></div>
@@ -482,15 +577,22 @@ const ChatBox = ({
         })}
         {/* Scroll to bottom reference */}
         <div ref={messagesEndRef} />
+        {isForwardMessageModalOpened && <ForwardMessageModal chats={chats} />}
       </div>
 
       {/* Fixed message input */}
-      <div className="sticky border bottom-0 flex justify-evenly items-center focus:border-none focus:outline-none w-full h-18 bg-white p-4">
+      <div className="sticky border bottom-0 flex justify-evenly items-center focus:border-none focus:outline-none w-full h-20 bg-[#e5eaed] p-4">
         <input
           type="text"
-          className="h-8 w-10/12 rounded-md border border-blue-400 focus:outline-none p-2"
+          className="h-5/6 w-11/12 rounded-md border focus:outline-none"
           value={newMessage}
           onChange={handleChange}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              handleSend();
+            }
+          }}
         />
         <BsEmojiSmile
           size={20}
@@ -508,12 +610,12 @@ const ChatBox = ({
           />
         </div>
 
-        <button
+        {/* <button
           className="h-7 w-14 bg-blue-500 hover:bg-blue-600 rounded-md"
           onClick={handleSend}
         >
           Send
-        </button>
+        </button> */}
       </div>
     </div>
   );

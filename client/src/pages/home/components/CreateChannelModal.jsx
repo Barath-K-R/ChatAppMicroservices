@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { getAllOrgUser } from "../api/UserApi";
+import { getAllOrgUser } from "../../../api/UserApi";
 import { AiFillCloseCircle } from "react-icons/ai";
 import { useSelector } from "react-redux";
 
@@ -100,11 +100,10 @@ const CreateChannelModal = ({
           {/* channel scope type */}
           <div className="flex justify-evenly items-center text-gray-600 w-12/12 h-1/6 rounded-md border hover:border-blue-300 bg-gray-100">
             <div
-              className={`organization flex justify-center items-center w-[30%] h-[35%] bg-white border border-2 ${
-                chatData.scope === "organization"
+              className={`organization flex justify-center items-center w-[30%] h-[35%] bg-white border border-2 ${chatData.scope === "organization"
                   ? "border-blue-400"
                   : "border-gray-300"
-              } hover:bg-blue-100 cursor-pointer`}
+                } hover:bg-blue-100 cursor-pointer`}
               onClick={() =>
                 setchatData((prev) => {
                   return { ...prev, scope: "organization" };
@@ -114,25 +113,10 @@ const CreateChannelModal = ({
               <span>Organization</span>
             </div>
             <div
-              className={`team flex justify-center items-center w-[30%] h-[35%] bg-white border border-2 ${
-                chatData.scope === "team"
+              className={`personal flex justify-center items-center w-[30%] h-[35%] bg-white border border-2 ${chatData.scope === "personal"
                   ? "border-blue-400"
                   : "border-gray-300"
-              } hover:bg-blue-100 cursor-pointer`}
-              onClick={() =>
-                setchatData((prev) => {
-                  return { ...prev, scope: "team" };
-                })
-              }
-            >
-              <span>Team</span>
-            </div>
-            <div
-              className={`personal flex justify-center items-center w-[30%] h-[35%] bg-white border border-2 ${
-                chatData.scope === "personal"
-                  ? "border-blue-400"
-                  : "border-gray-300"
-              } hover:bg-blue-100 cursor-pointer`}
+                } hover:bg-blue-100 cursor-pointer`}
               onClick={() =>
                 setchatData((prev) => {
                   return { ...prev, scope: "personal" };
@@ -157,7 +141,7 @@ const CreateChannelModal = ({
             />
           </div>
           {/* add participants */}
-          <div className="flex justify-between items-center w-full h-[6%]">
+          <div className="relative flex justify-between items-center w-full h-[6%]">
             <h2 className="w-2/6 pl-4">Add Participants</h2>
             <div className="flex w-4/6 h-10 border justify-start items-center border-gray-300 pl-2 rounded-md gap-4 overflow-hidden">
               {selectedUsers.length > 0 &&
@@ -187,7 +171,7 @@ const CreateChannelModal = ({
 
             {addParticpantModal && (
               <div
-                className="absolute left-[205px] bottom-32 w-[62%] h-18 bg-white rounded-md z-50 p-2 shadow-xl"
+                className="absolute left-56 top-12 w-[62%] h-18 bg-white rounded-md z-50 p-2 shadow-xl"
                 onClick={() => setaddParticpantModal(false)}
                 onMouseLeave={() => setaddParticpantModal(false)}
               >
@@ -215,9 +199,8 @@ const CreateChannelModal = ({
             <h2 className="w-2/6 pl-4">Visiblilty</h2>
             <div className="flex section justify-between items-center w-2/6 h-full rounded-3xl bg-gray-100 px-2 py-1">
               <div
-                className={`flex justify-center items-center open w-3/6 h-full ${
-                  chatData.visibility === "open" && buttonStyles.backgroundColor
-                } rounded-3xl text-sm cursor-pointer`}
+                className={`flex justify-center items-center open w-3/6 h-full ${chatData.visibility === "open" && buttonStyles.backgroundColor
+                  } rounded-3xl text-sm cursor-pointer`}
                 onClick={() =>
                   setchatData((prev) => {
                     return { ...prev, visibility: "open" };
@@ -227,10 +210,9 @@ const CreateChannelModal = ({
                 Open to All
               </div>
               <div
-                className={`flex justify-center items-center closed w-3/6 h-full ${
-                  chatData.visibility === "close" &&
+                className={`flex justify-center items-center closed w-3/6 h-full ${chatData.visibility === "closed" &&
                   buttonStyles.backgroundColor
-                } rounded-3xl text-sm cursor-pointer`}
+                  } rounded-3xl text-sm cursor-pointer`}
                 onClick={() =>
                   setchatData((prev) => {
                     return { ...prev, visibility: "closed" };

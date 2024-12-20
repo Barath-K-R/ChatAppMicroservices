@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { getAllOrgUser } from "../api/UserApi";
+import { getAllOrgUser } from "../../../api/UserApi";
 import { AiFillCloseCircle } from "react-icons/ai";
 import { AiOutlineSearch } from "react-icons/ai";
 import { useSelector } from "react-redux";
@@ -118,9 +118,8 @@ const UserSearchModal = ({
           </div>
           {/* users list */}
           <div
-            className={`flex w-5/6 ${
-              createChatSelection === "group" ? "h-2/5" : "h-5/6"
-            } flex-col gap-4 overflow-y-scroll`}
+            className={`flex w-5/6 ${createChatSelection === "group" ? "h-2/5" : "h-5/6"
+              } flex-col gap-4 overflow-y-scroll`}
             style={{ maxHeight: "350px" }}
           >
             {filteredUsers &&
@@ -132,9 +131,8 @@ const UserSearchModal = ({
                 return (
                   <div
                     key={user.id}
-                    className={`flex items-center w-full h-14 ${
-                      isSelected ? "bg-blue-100" : "bg-white"
-                    } gap-2 pl-4 rounded-md cursor-pointer hover:bg-gray-100`}
+                    className={`flex items-center w-full h-14 ${isSelected ? "bg-blue-100" : "bg-white"
+                      } gap-2 pl-4 rounded-md cursor-pointer hover:bg-gray-100`}
                     onClick={() => handleUserClick(user)}
                   >
                     <div className="flex w-10 h-10 rounded-3xl text-2xl justify-center items-center bg-gray-300">

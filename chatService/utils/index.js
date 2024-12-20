@@ -5,27 +5,33 @@ dotenv.config();
 
 
 let channel = null;
+let connection;
 
 export const createChannel = async () => {
     if (channel) return channel;
 
     try {
-        const connection = await amqplib.connect(process.env.MSG_QUEUE_URL);
+        if (!connection) {
+            connection = await amqplib.connect(process.env.MSG_QUEUE_URL);
+
+            connection.on("close", () => {
+                console.error("RabbitMQ connection closed. Reconnecting...");
+                connection = null;
+                channel = null;
+                setTimeout(createChannel, 5000);
+            });
+
+            connection.on("error", (err) => {
+                console.error("RabbitMQ connection error:", err);
+                connection = null;
+                channel = null;
+            });
+        }
+
         channel = await connection.createChannel();
-
-
+    
         await channel.assertExchange(process.env.EXCHANGE_NAME, "direct", { durable: true });
         await channel.assertQueue('chat_queue', { exclusive: false });
-
-        connection.on('close', () => {
-            console.error('RabbitMQ connection closed.');
-            channel = null;
-        });
-
-        connection.on('error', (err) => {
-            console.error('RabbitMQ connection error:', err);
-            channel = null;
-        });
 
         return channel;
     } catch (err) {

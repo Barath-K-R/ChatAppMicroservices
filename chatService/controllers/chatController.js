@@ -3,12 +3,23 @@ import * as chatService from '../services/chatService.js';
 const chatController = (app) => {
   app.post("/", async (req, res) => {
     const { currentUserId, userIds, chatType, name, description, visibility, scope } = req.body;
+    console.log('req='+req.body);
     try {
       const result = await chatService.createChat(currentUserId, userIds, chatType, name, description, visibility, scope);
       res.send(result);
     } catch (error) {
       console.error(error);
       res.status(500).send({ error: "An error occurred while processing your request." });
+    }
+  });
+
+  app.get("/roles", async (req, res) => {
+    try {
+      const roles = await chatService.getAllRoles();
+      res.status(200).json(roles);
+    } catch (error) {
+      console.error("Error fetching roles:", error);
+      res.status(500).json({ error: "An error occurred while fetching roles." });
     }
   });
 
@@ -20,10 +31,26 @@ const chatController = (app) => {
       if (!type || !userId) {
         return res.status(400).send({ error: "Missing required parameters" });
       }
-      const chats = await chatService.getCurrentUserChats(userId, type);
+      const chats = await chatService.getUserChatsByChatType(userId, type);
       res.send(chats);
     } catch (error) {
       console.error("Error fetching user chats:", error);
+      res.status(500).send({ error: "Internal Server Error" });
+    }
+  });
+
+  app.get("/:userId/all-chats", async (req, res) => {
+    const { userId } = req.params;
+    try {
+      if (!userId) {
+        return res.status(400).send({ error: "Missing required userId parameter" });
+      }
+
+      const chats = await chatService.getAllChatsWithUserDetails(userId);
+
+      res.send(chats);
+    } catch (error) {
+      console.error("Error fetching all user chats:", error);
       res.status(500).send({ error: "Internal Server Error" });
     }
   });
@@ -76,9 +103,10 @@ const chatController = (app) => {
 
   app.post("/:chatId/permissions", async (req, res) => {
     const { chatId } = req.params;
-    const { roles } = req.body;
+    const permisions = req.body;
+    console.log('cha permissions');
     try {
-      const result = await chatService.addRolePermissions(chatId, roles);
+      const result = await chatService.updateRolePermissions(chatId, permisions);
       res.status(200).json(result);
     } catch (error) {
       console.error("Error updating roles and permissions:", error);
@@ -105,6 +133,24 @@ const chatController = (app) => {
     } catch (error) {
       console.error(error);
       res.status(500).send({ message: "Error occurred while fetching role permissions" });
+    }
+  });
+
+  app.put("/:chatId/roles/:userId", async (req, res) => {
+    const { chatId, userId } = req.params;
+    const { role } = req.body;
+
+    if (!role) {
+      return res.status(400).send({ error: "Role is required." });
+    }
+
+    try {
+      console.log(role);
+      const result = await chatService.updateUserRole(chatId, userId, role);
+      res.status(200).json(result);
+    } catch (error) {
+      console.error("Error updating user role:", error);
+      res.status(500).json({ error: "An error occurred while updating the user role." });
     }
   });
 

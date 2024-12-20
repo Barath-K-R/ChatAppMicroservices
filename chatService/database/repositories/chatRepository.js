@@ -58,27 +58,29 @@ export const getRoleIdByName = async (roleName) => {
     }
 };
 
-export const createDirectChat = async (currentUserId, otherUserId, roleId) => {
+export const createDirectChat = async (currentUserId, otherUserId) => {
     try {
+
+        const memberRoleId = await getRoleIdByName('member');
+
         const newChat = await ChatModel.create({
             chat_type: "direct",
         });
 
         await ChatMembersModel.bulkCreate([
-            { chat_id: newChat.id, user_id: currentUserId, role_id: roleId },
-            { chat_id: newChat.id, user_id: otherUserId, role_id: roleId },
+            { chat_id: newChat.id, user_id: currentUserId, role_id: memberRoleId },
+            { chat_id: newChat.id, user_id: otherUserId, role_id: memberRoleId },
         ]);
 
-        const newChatWithMembers = await ChatModel.findOne({
-            where: { id: newChat.id },
-            // include: [
-            //     {
-            //         model: UserModel,
-            //         attributes: ["id", "username"],
-            //         through: { attributes: [] },
-            //     },
-            // ],
-        });
+        const newChatWithMembers = await ChatMembersModel.findOne({
+            where: { chat_id: newChat.id },
+            include: [
+              {
+                model: ChatModel,
+              },
+            ],
+            attributes: ["chat_id"],
+          });
 
         return newChatWithMembers;
     } catch (error) {
@@ -87,7 +89,7 @@ export const createDirectChat = async (currentUserId, otherUserId, roleId) => {
     }
 };
 
-export const createGroupChat = async (currentUserId, userIds, name, description, roleId) => {
+export const createGroupChat = async (currentUserId, userIds, name, description) => {
     try {
         const newGroup = await ChatModel.create({
             chat_type: "group",
@@ -98,16 +100,21 @@ export const createGroupChat = async (currentUserId, userIds, name, description,
         const groupMembers = userIds.map((user) => ({
             chat_id: newGroup.id,
             user_id: user,
-            role_id: roleId,
+            role_id: null,
         }));
-        groupMembers.push({ chat_id: newGroup.id, user_id: currentUserId, role_id: roleId });
+        groupMembers.push({ chat_id: newGroup.id, user_id: currentUserId, role_id: null });
 
         await ChatMembersModel.bulkCreate(groupMembers);
 
-        const newGroupWithMembers = await ChatModel.findOne({
-            where: { id: newGroup.id },
-            attributes: ["id", "name"],
-        });
+        const newGroupWithMembers = await ChatMembersModel.findOne({
+            where: { chat_id: newGroup.id },
+            include: [
+              {
+                model: ChatModel,
+              },
+            ],
+            attributes: ["chat_id"], 
+          });
 
         return newGroupWithMembers;
     } catch (error) {
@@ -116,8 +123,11 @@ export const createGroupChat = async (currentUserId, userIds, name, description,
     }
 };
 
-export const createChannelChat = async (currentUserId, userIds, name, description, visibility, scope, roleId) => {
+export const createChannelChat = async (currentUserId, userIds, name, description, visibility, scope) => {
     try {
+        const adminRoleId = await getRoleIdByName('admin');
+        const memberRoleId = await getRoleIdByName('member');
+
         const newChannel = await ChatModel.create({
             chat_type: "channel",
             name,
@@ -129,16 +139,22 @@ export const createChannelChat = async (currentUserId, userIds, name, descriptio
         const channelMembers = userIds.map((user) => ({
             chat_id: newChannel.id,
             user_id: user,
-            role_id: roleId,
+            role_id: memberRoleId,
         }));
-        channelMembers.push({ chat_id: newChannel.id, user_id: currentUserId, role_id: roleId });
+        channelMembers.push({ chat_id: newChannel.id, user_id: currentUserId, role_id: adminRoleId });
 
         await ChatMembersModel.bulkCreate(channelMembers);
 
-        const newChannelWithMembers = await ChatModel.findOne({
-            where: { id: newChannel.id },
-            attributes: ["id", "name"],
-        });
+        const newChannelWithMembers = await ChatMembersModel.findOne({
+            where: { chat_id: newChannel.id },
+            include: [
+              {
+                model: ChatModel,
+              },
+            ],
+            attributes: ["chat_id"], 
+          });
+          
 
         return newChannelWithMembers;
     } catch (error) {
@@ -219,11 +235,58 @@ export const getChatsByUserIdAndType = async (userId, type) => {
                 },
             });
         }
-        console.log(chats);
         return chats;
     } catch (error) {
         console.error("Error fetching chats by user ID and type:", error);
         throw error;
+    }
+};
+
+export const getAllChatsByUserId = async (userId) => {
+    try {
+        const directChats = await ChatMembersModel.findAll({
+            attributes: ['chat_id', 'user_id'],
+            where: {
+                chat_id: {
+                    [Op.in]: sequelize.literal(`(
+              SELECT chat_id 
+              FROM chat_members 
+              WHERE user_id = ${userId}
+            )`),
+                },
+                user_id: {
+                    [Op.ne]: userId,
+                },
+            },
+            include: [
+                {
+                    model: ChatModel,
+                    where: {
+                        chat_type: 'direct',
+                    },
+                    attributes: ["id", "name", "chat_type"],
+                },
+            ],
+        });
+        const groupAndChannelChats = await ChatMembersModel.findAll({
+            attributes: ['chat_id'],
+            include: [
+                {
+                    model: ChatModel,
+                    attributes: ['id', 'name', 'description', 'visibility', 'scope', 'chat_type'],
+                },
+            ],
+            where: {
+                user_id: userId,
+            },
+        });
+
+        const allChats = [...directChats, ...groupAndChannelChats];
+
+        return allChats;
+    } catch (error) {
+        console.error('Error fetching all chats by user ID:', error);
+        throw new Error('Unable to fetch chats');
     }
 };
 
@@ -259,8 +322,6 @@ export const addMembersToChatInRepo = async (members) => {
         throw error;
     }
 };
-
-
 
 export const removeMembersFromChatInRepo = async (chatId, userIds) => {
     try {
@@ -323,12 +384,48 @@ export const getAllRolePermissionsFromRepo = async (chatId) => {
     }
 };
 
+export const getAllRoles = async () => {
+    try {
+        const roles = await RoleModel.findAll({
+            attributes: ["id", "name"],
+        });
+        return roles;
+    } catch (error) {
+        console.error("Error fetching roles from database:", error);
+        throw new Error("Failed to fetch roles");
+    }
+};
+
 export const getRoleByName = async (name) => {
     try {
         return await RoleModel.findOne({ where: { name } });
     } catch (error) {
         console.error("Error fetching role by name:", error);
         throw error;
+    }
+};
+
+export const updateRole = async (chatId, userId, role) => {
+    console.log(chatId + ' ' + userId);
+    try {
+        const roleRecord = await RoleModel.findOne({ where: { name: role } });
+
+        if (!roleRecord) {
+            throw new Error('Role not found.');
+        }
+
+        const member = await ChatMembersModel.findOne({ where: { chat_id: chatId, user_id: userId } });
+
+        if (!member) {
+            throw new Error('User is not a member of this chat.');
+        }
+
+        member.role_id = roleRecord.id;
+        await member.save();
+
+        return { message: 'User role updated successfully.', member };
+    } catch (error) {
+        throw new Error('Error updating role: ' + error.message);
     }
 };
 
@@ -345,12 +442,60 @@ export const getPermissionsByChatAndRole = async (chatId, roleId) => {
     }
 };
 
+export const getAllPermissions = async () => {
+    try {
+        return await PermissionModel.findAll();
+    } catch (error) {
+        console.error("Error fetching all permissions:", error);
+        throw error;
+    }
+};
+
 export const getPermissionByName = async (name) => {
     try {
         return await PermissionModel.findOne({ where: { name } });
     } catch (error) {
         console.error("Error fetching permission by name:", error);
         throw error;
+    }
+};
+
+export const addPermissionsToChat = async (chatId) => {
+    console.log('adding permissions'+chatId);
+    try {
+        const roles = await RoleModel.findAll({
+            where: {
+                name: ['admin', 'moderator', 'member'],
+            },
+        });
+
+        const adminRoleId = roles.find(role => role.name === 'admin').id;
+        const memberRoleId = roles.find(role => role.name === 'member').id;
+
+        const permissions = await PermissionModel.findAll();
+
+        const adminPermissions = permissions.map(permission => ({
+            chat_id: chatId,
+            role_id: adminRoleId,
+            permission_id: permission.id
+        }));
+
+        const memberPermissions = [
+            {
+                chat_id: chatId,
+                role_id: memberRoleId,
+                permission_id: permissions.find(permission => permission.name === "send message").id
+            }
+        ];
+
+        await ChatPermissionModel.bulkCreate(adminPermissions);
+
+        await ChatPermissionModel.bulkCreate(memberPermissions);
+
+        console.log("Permissions successfully added for chat:", chatId);
+    } catch (error) {
+        console.error("Error adding permissions to chat:", error);
+        throw new Error("Failed to add permissions to chat.");
     }
 };
 

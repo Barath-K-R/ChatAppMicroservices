@@ -6,30 +6,41 @@ dotenv.config()
 
 
 let channel = null;
+let connection;
 
 export const createChannel = async () => {
-  if(channel) return channel;
+  if (channel) return channel;
 
   try {
-    const connection = await amqplib.connect(process.env.MSG_QUEUE_URL);
+    if (!connection) {
+      connection = await amqplib.connect(process.env.MSG_QUEUE_URL);
+
+      connection.on("close", () => {
+        console.error("RabbitMQ connection closed. Reconnecting...");
+        connection = null;
+        channel = null;
+        setTimeout(createChannel, 5000);
+      });
+
+      connection.on("error", (err) => {
+        console.error("RabbitMQ connection error:", err);
+        connection = null;
+        channel = null;
+      });
+    }
     channel = await connection.createChannel();
 
     await channel.assertExchange(process.env.EXCHANGE_NAME, "direct", { durable: true });
-    await channel.assertQueue('message_queue', { durable: true }); 
-    await channel.bindQueue('message_queue', process.env.EXCHANGE_NAME, 'message_find');
-    await channel.bindQueue('message_queue', process.env.EXCHANGE_NAME, 'message_update');
-    await channel.bindQueue('message_queue', process.env.EXCHANGE_NAME, 'message_create');
 
+    await channel.assertQueue('message_find_queue', { durable: true });
+    await channel.assertQueue('message_update_queue', { durable: true });
+    await channel.assertQueue('message_create_queue', { durable: true });
+    
+    await channel.bindQueue('message_find_queue', process.env.EXCHANGE_NAME, 'message_find');
+    await channel.bindQueue('message_update_queue', process.env.EXCHANGE_NAME, 'message_update');
+    await channel.bindQueue('message_create_queue', process.env.EXCHANGE_NAME, 'message_create');
+    
 
-    connection.on('close', () => {
-      console.error('RabbitMQ connection closed.');
-      channel = null; 
-    });
-
-    connection.on('error', (err) => {
-      console.error('RabbitMQ connection error:', err);
-      channel = null;
-    });
 
     return channel;
   } catch (err) {
@@ -62,14 +73,23 @@ export const publishMessage = async (routingKey, message) => {
 export const SubscribeMessage = async () => {
   const channel = await createChannel();
 
-  channel.consume(
-      'message_queue',
+  const queues = [
+    { queue: 'message_create_queue', event: 'message_create' },
+    { queue: 'message_update_queue', event: 'message_update' },
+    { queue: 'message_find_queue', event: 'message_find' },
+  ];
+
+  queues.forEach(({ queue, event }) => {
+    channel.consume(
+      queue,
       (msg) => {
-          if (msg && msg.content) {
-              subscribeEvents(msg);  
-              channel.ack(msg);
-          }
+        if (msg && msg.content) {
+          subscribeEvents(msg, event);
+          channel.ack(msg);
+        }
       },
       { noAck: false }
-  );
+    );
+  });
 };
+

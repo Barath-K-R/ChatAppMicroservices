@@ -14,7 +14,7 @@ const RefreshTokenModel = sequelize.define("RefreshToken", {
         allowNull: false,
     },
     refresh_token: {
-        type: DataTypes.STRING,
+        type: DataTypes.STRING(255),  
         allowNull: false,
         unique: true,
     },
@@ -27,6 +27,10 @@ const RefreshTokenModel = sequelize.define("RefreshToken", {
     timestamps: false, 
 });
 
-RefreshTokenModel.belongsTo(UserModel, { foreignKey: "user_id" });
+RefreshTokenModel.belongsTo(UserModel, {
+    foreignKey: "user_id",
+    onDelete: "CASCADE",
+});
 
 export default RefreshTokenModel;
+

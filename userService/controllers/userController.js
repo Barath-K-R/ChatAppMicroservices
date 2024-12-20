@@ -3,20 +3,6 @@ import * as userService from "../services/userService.js";
 
 const UserController = (app) => {
 
-  app.post("/", async (req, res) => {
-    const { username, email, password } = req.body;
-    try {
-      const newUser = await userService.addUser({ username, email, password });
-      res.status(200).json(newUser);
-    } catch (error) {
-      console.error("Error adding user:", error);
-      res.status(500).json({
-        message: "An error occurred while adding the user.",
-        error: error.message,
-      });
-    }
-  });
-
   app.get("/ids", async (req, res) => {
     console.log('finding userids');
     const { userIds } = req.body;
@@ -66,10 +52,28 @@ const UserController = (app) => {
     }
   });
 
-  app.post("/login", async (req, res) => {
-    const { username, password } = req.body;
+  app.post("/signup", async (req, res) => {
+    const { email, password } = req.body;
     try {
-      const result = await userService.login({ username, password });
+      const username = email.split('@')[0]; 
+      const newUser = await userService.addUser({ username, email, password });
+      res.status(201).json({
+        message: "User signed up successfully",
+        user: newUser,
+      });
+    } catch (error) {
+      console.error("Error signing up user:", error);
+      res.status(500).json({
+        message: "An error occurred during signup.",
+        error: error.message,
+      });
+    }
+  });
+
+  app.post("/login", async (req, res) => {
+    const { identifier, password } = req.body;
+    try {
+      const result = await userService.login({ identifier, password });
       res.status(200).json(result);
     } catch (error) {
       console.error("Error during login:", error);
@@ -102,17 +106,15 @@ const UserController = (app) => {
   });
 
   app.post("/join-org", async (req, res) => {
-    const { userId, organizationId } = req.body;
-
+    const { userId, orgName } = req.body;
+    console.log(userId+' '+orgName);
     try {
-      const result = await userService.joinOrganization(userId, organizationId);
-      res.status(200).json({
-        message: "User successfully joined the organization",
-        data: result,
-      });
+      const updatedUser = await userService.joinOrganization(userId, orgName);
+  
+      res.status(200).json(updatedUser);
     } catch (error) {
       console.error("Error joining organization:", error);
-
+  
       res.status(error.status || 500).json({
         message: error.message || "An unexpected error occurred",
       });

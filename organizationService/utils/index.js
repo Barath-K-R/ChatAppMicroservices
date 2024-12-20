@@ -1,24 +1,36 @@
 import amqplib from 'amqplib';
+import { subscribeEvents } from '../services/organizationService.js';
 
 let channel;
+let connection;
 
 const createChannel = async () => {
   if (channel) return channel;
   try {
-    const connection = await amqplib.connect(process.env.MSG_QUEUE_URL);
+    if (!connection) {
+      connection = await amqplib.connect(process.env.MSG_QUEUE_URL);
+
+      connection.on("close", () => {
+        console.error("RabbitMQ connection closed. Reconnecting...");
+        connection = null;
+        channel = null;
+        setTimeout(createChannel, 5000);
+      });
+
+      connection.on("error", (err) => {
+        console.error("RabbitMQ connection error:", err);
+        connection = null;
+        channel = null;
+      });
+    }
     channel = await connection.createChannel();
 
     await channel.assertExchange(process.env.EXCHANGE_NAME, 'direct', { durable: true });
 
-    connection.on('close', () => {
-      console.error('RabbitMQ connection closed.');
-      channel = null;
+    await channel.assertQueue("fetch_organization_queue", {
+      durable: true,
     });
-
-    connection.on('error', (err) => {
-      console.error('RabbitMQ connection error:', err);
-      channel = null;
-    });
+    await channel.bindQueue("fetch_organization_queue", process.env.EXCHANGE_NAME, "fetch_organization");
 
     return channel;
 
@@ -44,4 +56,17 @@ const publishMessage = async (routingKey, message) => {
   }
 };
 
+export const SubscribeMessage = async () => {
+
+  channel.consume(
+    'fetch_organization_queue',
+    (msg) => {
+      if (msg && msg.content) {
+        subscribeEvents(msg, 'fetch_organization');
+        channel.ack(msg);
+      }
+    },
+    { noAck: false }
+  );
+}
 export { createChannel, publishMessage };

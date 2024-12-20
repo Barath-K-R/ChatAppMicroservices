@@ -1,5 +1,6 @@
 import UserModel from "../models/userModel.js";
 import RefreshTokenModel from '../models/refreshTokenModel.js'
+import { Op } from "sequelize"; 
 
 export const createUser = async (userData) => {
   try {
@@ -10,7 +11,8 @@ export const createUser = async (userData) => {
   }
 };
 
-export const findUserById = async (id) => {
+export const findByUserId = async (id) => {
+  console.log('userid='+id);
   try {
     return await UserModel.findByPk(id);
   } catch (error) {
@@ -19,12 +21,13 @@ export const findUserById = async (id) => {
   }
 };
 
-export const findUsersByIds = async (userIds) => {
+export const findByUserIds = async (userIds) => {
   try {
     const users = await UserModel.findAll({
       where: {
         id: userIds
-      }
+      },
+      attributes:['id','username']
     });
     return users;
   } catch (error) {
@@ -42,6 +45,20 @@ export const findUsersByOrganizationId = async (organizationId) => {
   }
 };
 
+const getOrganizationByName = async (orgName) => {
+  try {
+   
+    const organization = await OrganizationModel.findOne({
+      where: { name: orgName },
+    });
+
+    return organization; 
+  } catch (error) {
+    console.error("Error fetching organization by name:", error);
+    throw error; 
+  }
+};
+
 export const updateUserOrganization = async (userId, organizationId) => {
   try {
     return await UserModel.update(
@@ -55,12 +72,19 @@ export const updateUserOrganization = async (userId, organizationId) => {
 };
 
 
-export const findUserByUsername = async (username) => {
+export const findUserByIdentifier = async (identifier) => {
   try {
-      return await UserModel.findOne({ where: { username } });
+    return await UserModel.findOne({
+      where: {
+        [Op.or]: [
+          { username: identifier },
+          { email: identifier }
+        ]
+      }
+    });
   } catch (error) {
-      console.error("Error finding user by username:", error);
-      throw error; 
+    console.error("Error finding user by identifier (username or email):", error);
+    throw error;
   }
 };
 

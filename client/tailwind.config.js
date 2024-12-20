@@ -5,12 +5,16 @@ module.exports = {
   ],
   theme: {
     extend: {
-      flexGrow: {
-        '2': '2',
-        '10': '10',
-      }
+      keyframes: {
+        fadeOut: {
+          '0%': { backgroundColor: 'rgba(254, 243, 199, 1)' }, 
+          '100%': { backgroundColor: 'rgba(255, 255, 255, 0)' }, 
+        },
+      },      
+      animation: {
+        fadeOut: 'fadeOut 4s forwards', 
+      },
     },
   },
   plugins: [],
-}
-
+};

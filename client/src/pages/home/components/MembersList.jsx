@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from "react";
-import { useSelector } from "react-redux";
+import { useSelector, useDispatch } from "react-redux";
 
-import { addMembersToChat, removeMembersFromChat } from "../api/ChatApi.js";
-import { getAllOrgUser } from "../api/UserApi.js";
-import AddMemberModal from "./AddMemberModal.jsx";
+import { addMembersToChat, removeMembersFromChat,updateRole} from "../../../api/ChatApi.js";
+import { getAllOrgUser } from "../../../api/UserApi.js";
 import { AiFillCloseCircle } from "react-icons/ai";
 import { AiOutlineSearch } from "react-icons/ai";
 import { BsThreeDotsVertical } from "react-icons/bs";
@@ -24,7 +23,58 @@ const MembersList = ({
   const [selectedUsers, setselectedUsers] = useState([]);
   const [selectedMembers, setSelectedMembers] = useState([]);
   const [addMember, setaddMember] = useState(false);
+  const [isUserPromotionModalOpened, setisUserPromotionModalOpened] = useState(false)
+  const [selectedMemberId, setSelectedMemberId] = useState(null);
+
+  const dispatch = useDispatch()
+
   const currentUser = useSelector((state) => state.user.authUser);
+  const permissions = useSelector(state => state.chats.chatPermissions)
+  const currentUserRole = useSelector(state => state.chats.currentUserRole)
+  const currentChat=useSelector(state=>state.chats.currentChat)
+
+  //updating user role
+  const updateUserRole = async(newRole) => {
+    if (!selectedMemberId) {
+      toast.error("No user selected for role update!", {
+        position: "top-right",
+      });
+      return;
+    }
+
+    const userPermissions = permissions[currentUserRole] || [];
+
+    if (currentChat.Chat.chat_type==='channel' && !userPermissions.includes("promote users")) {
+      toast.error("You do not have permission to promote users!", {
+        position: "top-right",
+      });
+      return;
+    }
+
+    try {
+      await updateRole(currentChat.chat_id, selectedMemberId, newRole);
+
+      dispatch({
+        type: "UPDATE_MEMBER_ROLE",
+        payload: {
+          userId: selectedMemberId,
+          newRole,
+        },
+      });
+  
+      toast.success(`User role updated to ${newRole}`, {
+        position: "top-right",
+      });
+  
+      setisUserPromotionModalOpened(false);
+      setSelectedMemberId(null);
+    } catch (error) {
+      toast.error("Error updating user role.", {
+        position: "top-right",
+      });
+      console.error("Error updating user role:", error);
+    }
+  };
 
   //handling user selection
   const handleUserClick = (user) => {
@@ -82,20 +132,21 @@ const MembersList = ({
 
   //handling addparticipant
   const handleAddParticipant = async () => {
-    const addParticipantPermission = userPermissions.find(
-      (permission) => permission.Permission.name === "add participants"
-    );
-    if (!addParticipantPermission) {
+    const userPermissions = permissions[currentUserRole] || [];
+
+    if (!userPermissions.includes("add participants")) {
       toast.error("You do not have permission to add a participant!", {
         position: "top-right",
       });
       return;
     }
+
     try {
       const userIds = selectedUsers.map((user) => user.id);
-      const chatMembers = await addMembersToChat(chat.chat_id, userIds);
-      if (chatMembers) {
-        toast.success("members were added successfully", {
+      const updatedChatMembers = await addMembersToChat(chat.chat_id, userIds);
+
+      if (updatedChatMembers) {
+        toast.success("Members were added successfully", {
           position: "top-right",
         });
         reset();
@@ -107,12 +158,10 @@ const MembersList = ({
 
   //handling remove participants
   const handleRemoveParticipants = async () => {
-    const removeParticipantPermission = userPermissions.find(
-      (permission) => permission.Permission.name === "remove participants"
-    );
+    const userPermissions = permissions[currentUserRole] || [];
 
-    if (!removeParticipantPermission) {
-      toast.error("You do not have permission to add a participant!", {
+    if (!userPermissions.includes("remove participants")) {
+      toast.error("You do not have permission to remove a participant!", {
         position: "top-right",
       });
       return;
@@ -120,20 +169,18 @@ const MembersList = ({
 
     try {
       const userIds = selectedMembers?.map((member) => member?.user_id);
- 
-      const chatMembers = await removeMembersFromChat(chat.chat_id, userIds);
-      if (chatMembers) {
-        toast.success("members were removed successfully", {
+
+      const updatedChatMembers = await removeMembersFromChat(chat.chat_id, userIds);
+      if (updatedChatMembers) {
+        toast.success("Members were removed successfully", {
           position: "top-right",
         });
         setchatMembers((prev) =>
-          prev.filter((member) => {
-            if (!userIds.includes(member.user_id))
-              return member;
-          })
+          prev.filter((member) => !userIds.includes(member.user_id))
         );
         reset();
       }
+      // setfilteredMembers(prev=>prev.filter(member=>member.))
     } catch (error) {
       console.log(error);
     }
@@ -143,10 +190,11 @@ const MembersList = ({
     setselectedUsers([]);
     setSelectedMembers([]);
   };
+
   return (
     <div className="fixed inset-0 flex items-center justify-center z-50 ">
-      <div className="absolute inset-0 bg-black bg-opacity-55 " />
-      <div className="relative bottom-0 flex flex-col items-center gap-6 w-3/6 h-[94%]  bg-white shadow-lg ">
+      <div className="absolute inset-0 bg-black bg-opacity-70 " />
+      <div className="whitebox relative bottom-0 flex flex-col items-center gap-6 w-3/6 h-[94%] bg-white shadow-lg ">
         {/* title */}
         <div className="flex justify-between items-center w-full h-10 p-6 bg-gray-100">
           <section className="flex gap-3">
@@ -235,7 +283,7 @@ const MembersList = ({
         {/*members list*/}
         {!addMember && (
           <div
-            className={`flex w-5/6 h-3/6 flex-col gap-4 overflow-y-scroll`}
+            className={`flex w-5/6 h-3/6 flex-col gap-4 custom-scrollbar overflow-y-scroll`}
             style={{ maxHeight: "350px" }}
           >
             {filteredMembers &&
@@ -258,8 +306,31 @@ const MembersList = ({
                       </div>
                       <span>{member?.User?.username}</span>
                     </section>
-                    <div className="box flex items-center justify-center w-6 h-6 bg-white rounded-md hover:border hover:border-gray-300">
+                    <div className="box relative flex items-center justify-center w-6 h-6 bg-white rounded-md hover:border hover:border-gray-300"
+                      onClick={() => {
+                        setisUserPromotionModalOpened(prev => !prev)
+                        setSelectedMemberId(member.User.id)
+                      }}>
                       <BsThreeDotsVertical className="cursor-pointer" />
+                      {isUserPromotionModalOpened && selectedMemberId === member.User.id && currentChat.Chat.chat_type==='channel' && (
+                        <div
+                          className="userpromotionmodal absolute w-48 text-[16px] bg-white shadow-lg border rounded-md z-50 p-2"
+                          style={{
+                            top: "110%", // Offset to show below the three dots
+                            right: 20
+                          }}
+                        >
+                          <ul>
+                            <li className="p-1 hover:text-blue-500 hover:bg-blue-100" onClick={() => updateUserRole('admin')}>
+                              <span>Assign as admin</span>
+                            </li>
+                            <li className="p-1 hover:text-blue-500 hover:bg-blue-100" onClick={() => updateUserRole('moderator')}>
+                              <span>Assign as moderator</span>
+                            </li>
+                          </ul>
+                        </div>
+                      )}
+
                     </div>
                   </div>
                 );

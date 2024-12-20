@@ -22,19 +22,19 @@ const app = express();
 
 
 app.use(cors());
-app.use(express.json()); 
-app.use(express.urlencoded({ extended: true })); 
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 (async () => {
     try {
         await sequelize.authenticate();
         console.log("Database connection established successfully.");
 
-        await sequelize.sync({ alter: true });
+        await sequelize.sync({ alter: false });
         console.log("All models were synchronized successfully.");
 
         setupAssociations();
-        
+
         chatController(app);
 
         const PORT = process.env.PORT || 7000;

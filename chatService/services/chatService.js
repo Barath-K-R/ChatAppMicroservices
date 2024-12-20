@@ -1,3 +1,4 @@
+
 import * as chatRepository from '../database/repositories/chatRepository.js';
 import { publishMessage, createChannel } from '../utils/index.js';
 import dotenv from 'dotenv'
@@ -18,17 +19,18 @@ export const createChat = async (currentUserId, userIds, chatType, name, descrip
             return { message: "Chat already exists", chatExists };
         }
 
-        const roleId = await chatRepository.getRoleIdByName("member");
         let newChat;
 
         if (chatType === "direct") {
-            newChat = await chatRepository.createDirectChat(currentUserId, userIds[0], roleId);
+            newChat = await chatRepository.createDirectChat(currentUserId, userIds[0]);
         } else if (chatType === "group") {
-            newChat = await chatRepository.createGroupChat(currentUserId, userIds, name, description, roleId);
+            newChat = await chatRepository.createGroupChat(currentUserId, userIds, name, description);
         } else {
-            newChat = await chatRepository.createChannelChat(currentUserId, userIds, name, description, visibility, scope, roleId);
+            newChat = await chatRepository.createChannelChat(currentUserId, userIds, name, description, visibility, scope);
+            await chatRepository.addPermissionsToChat(newChat.chat_id)
         }
 
+       
         return { newChat, message: "New chat created and users added successfully" };
     } catch (error) {
         console.error("Error creating chat:", error);
@@ -90,7 +92,7 @@ export const getChatMembers = async (chatId) => {
             );
 
             await new Promise((resolve, reject) => {
-                const timeout = setTimeout(() => reject(new Error("Timeout waiting for user details")), 10000);
+                const timeout = setTimeout(() => reject(new Error("Timeout waiting for user details")), 2000);
                 const interval = setInterval(() => {
                     if (userDetails) {
                         clearTimeout(timeout);
@@ -99,8 +101,6 @@ export const getChatMembers = async (chatId) => {
                     }
                 }, 100);
             });
-
-            await channel.close();
         } catch (error) {
             console.error("Error fetching user details:", error);
         }
@@ -122,7 +122,7 @@ export const getChatMembers = async (chatId) => {
 };
 
 
-export const getCurrentUserChats = async (userId, type) => {
+export const getUserChatsByChatType = async (userId, type) => {
     if (!type || !userId) {
         return [];
     }
@@ -172,8 +172,6 @@ export const getCurrentUserChats = async (userId, type) => {
                     }
                 }, 100);
             });
-
-            await channel.close();
         } catch (error) {
             console.error("Error fetching user details:", error);
         }
@@ -191,6 +189,70 @@ export const getCurrentUserChats = async (userId, type) => {
     } catch (error) {
         console.error("Error fetching user chats:", error);
         return { error: "Internal Server Error" };
+    }
+};
+
+export const getAllChatsWithUserDetails = async (userId) => {
+    try {
+
+        const allChats = await chatRepository.getAllChatsByUserId(userId);
+
+        const directChats = allChats.filter(chat => chat.Chat.chat_type === 'direct');
+        const groupAndChannelChats = allChats.filter(chat => chat.Chat.chat_type !== 'direct');
+
+        if (directChats.length > 0) {
+
+            const userIds = directChats.map(chat => chat.user_id);
+
+            let userDetails;
+
+            const channel = await createChannel();
+            const responseQueue = await channel.assertQueue("", { exclusive: true });
+            const correlationId = crypto.randomUUID();
+
+            const responsePromise = new Promise((resolve, reject) => {
+
+                channel.consume(
+                    responseQueue.queue,
+                    (msg) => {
+                        if (msg.properties.correlationId === correlationId) {
+                            userDetails = JSON.parse(msg.content.toString());
+                            resolve();
+                            channel.ack(msg);
+                        }
+                    },
+                    { noAck: false }
+                );
+
+                setTimeout(() => reject(new Error('Timeout waiting for user details')), 10000);
+            });
+
+            channel.publish(
+                process.env.EXCHANGE_NAME,
+                'fetch_user_details',
+                Buffer.from(JSON.stringify(userIds)),
+                { replyTo: responseQueue.queue, correlationId }
+            );
+
+            await responsePromise;
+
+            const enrichedDirectChats = directChats.map((chat) => {
+                const user = userDetails.find(user => user.id === chat.user_id);
+                return {
+                    ...chat.toJSON(),
+                    user: user || {},
+                };
+            });
+
+            const allChatsWithUserDetails = [...enrichedDirectChats, ...groupAndChannelChats];
+
+            return allChatsWithUserDetails;
+        } else {
+            return groupAndChannelChats;
+        }
+    } catch (error) {
+        console.error('Error fetching all chats with user details:', error);
+        throw new Error('Unable to fetch chats');
     }
 };
 
@@ -237,7 +299,6 @@ export const addMembersToChat = async (chatId, userIds) => {
                 }, 100);
             });
 
-            await channel.close();
         } catch (error) {
             console.error("Error fetching user details:", error);
             return { status: 500, error: "Failed to validate users" };
@@ -309,7 +370,6 @@ export const removeMembersFromChat = async (chatId, userIds) => {
                 }, 100);
             });
 
-            await channel.close();
         } catch (error) {
             console.error("Error fetching user details:", error);
             return { error: "Failed to validate users" };
@@ -327,6 +387,20 @@ export const removeMembersFromChat = async (chatId, userIds) => {
     } catch (error) {
         console.error("Error removing members:", error);
         return { error: "An error occurred while removing members." };
+    }
+};
+
+export const getAllRoles = async () => {
+    try {
+        const roles = await chatRepository.getAllRoles();
+
+        return roles.reduce((acc, role) => {
+            acc[role.name] = role.id;
+            return acc;
+        }, {});
+    } catch (error) {
+        console.error("Error in role service:", error);
+        throw new Error("Failed to retrieve roles");
     }
 };
 
@@ -361,12 +435,28 @@ export const getAllRolePermissions = async (chatId) => {
     }
 };
 
+export const updateUserRole = async (chatId, userId, role) => {
+    try {
+      const updatedRole = await chatRepository.updateRole(chatId, userId, role);
+      return updatedRole;
+    } catch (error) {
+      throw new Error('Error updating user role: ' + error.message);
+    }
+  };
 
-export const addRolePermissions = async (chatId, roles) => {
+  
+export const updateRolePermissions = async (chatId, permissions) => {
+    console.log(permissions);
     try {
         const roleMappings = { admin: "admin", moderator: "moderator", member: "member" };
 
-        for (const [role, newPermissions] of Object.entries(roles)) {
+        const allPermissions = await chatRepository.getAllPermissions();
+        const permissionMap = allPermissions.reduce((acc, perm) => {
+            acc[perm.name] = perm.id;
+            return acc;
+        }, {});
+
+        for (const [role, newPermissions] of Object.entries(permissions)) {
             const roleRecord = await chatRepository.getRoleByName(roleMappings[role]);
             if (!roleRecord) return { error: `Role ${role} not found.` };
 
@@ -377,19 +467,19 @@ export const addRolePermissions = async (chatId, roles) => {
 
             const permissionsToAdd = newPermissions.filter(perm => !currentPermissionNames.includes(perm));
             const permissionsToRemove = newPermissions.filter(perm => currentPermissionNames.includes(perm));
-
+            console.log(permissionsToAdd);
+            console.log(permissionsToRemove);
             for (const permissionName of permissionsToAdd) {
-                console.log(permissionName);
-                const permissionRecord = await chatRepository.getPermissionByName(permissionName);
-                if (permissionRecord) {
-                    await chatRepository.addPermissionToRoleInChat(chatId, roleId, permissionRecord.id);
+                const permissionId = permissionMap[permissionName];
+                if (permissionId) {
+                    await chatRepository.addPermissionToRoleInChat(chatId, roleId, permissionId);
                 }
             }
 
             for (const permissionName of permissionsToRemove) {
-                const permissionRecord = await chatRepository.getPermissionByName(permissionName);
-                if (permissionRecord) {
-                    await chatRepository.removePermissionFromRoleInChat(chatId, roleId, permissionRecord.id);
+                const permissionId = permissionMap[permissionName];
+                if (permissionId) {
+                    await chatRepository.removePermissionFromRoleInChat(chatId, roleId, permissionId);
                 }
             }
         }

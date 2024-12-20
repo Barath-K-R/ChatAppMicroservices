@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useSelector, useDispatch } from "react-redux";
 import { AiFillCloseCircle } from "react-icons/ai";
 import { TiGroup } from "react-icons/ti";
 import { BsThreeDotsVertical } from "react-icons/bs";
@@ -7,10 +8,10 @@ import {
   addRolePermissions,
   getAllRolePermissions,
   deleteChat,
-} from "../api/ChatApi.js";
-import { deleteMessages } from "../api/messageApi.js";
+} from "../../../api/ChatApi.js";
+import { deleteMessages } from "../../../api/messageApi.js";
 
-const ChatInfo = ({ currentChat,setCurrentChat, setMessages, setChats,setchatInfoModalOpened }) => {
+const ChatInfo = ({ currentChat, setMessages, setChats, setchatInfoModalOpened }) => {
   const permissionsTableRowActions = [
     "edit chat info",
     "add participants",
@@ -23,13 +24,16 @@ const ChatInfo = ({ currentChat,setCurrentChat, setMessages, setChats,setchatInf
     "delete messages",
   ];
 
-  const [permissions, setPermissions] = useState({
+  const permissions = useSelector(state => state.chats.chatPermissions)
+  const currentUserRole = useSelector(state => state.chats.currentUserRole)
+  const [changedPermissions, setChangedPermissions] = useState({
     admin: [],
     moderator: [],
     member: [],
   });
 
   const [isModalOpened, setisModalOpened] = useState(false);
+  const dispatch = useDispatch()
 
   useEffect(() => {
     const fetchAllRolePermissions = async () => {
@@ -48,13 +52,11 @@ const ChatInfo = ({ currentChat,setCurrentChat, setMessages, setChats,setchatInf
             permissionsByRole[role].push(item.permission_name);
           }
         });
- 
-        setPermissions((prev) => ({
-          ...prev,
-          admin: permissionsByRole.admin || [],
-          moderator: permissionsByRole.moderator || [],
-          member: permissionsByRole.member || [],
-        }));
+
+        dispatch({
+          type: "SET_CHAT_PERMISSIONS",
+          payload: permissionsByRole,
+        })
       } catch (error) {
         console.error("Error fetching permissions:", error);
       }
@@ -64,6 +66,16 @@ const ChatInfo = ({ currentChat,setCurrentChat, setMessages, setChats,setchatInf
   }, []);
 
   const handleClearChat = async () => {
+
+    const userPermissions = permissions[currentUserRole] || [];
+
+    if (currentChat.Chat.chat_type === 'channel' && !userPermissions.includes("clear all messages")) {
+      toast.error("You do not have permission to clear all messages!", {
+        position: "top-right",
+      });
+      return;
+    }
+
     try {
       const clearMessageResponse = await deleteMessages(currentChat.chat_id);
 
@@ -75,30 +87,58 @@ const ChatInfo = ({ currentChat,setCurrentChat, setMessages, setChats,setchatInf
   };
 
   const handlePermissionChange = (role, action) => {
-    setPermissions((prevPermissions) => {
-      const rolePermissions = prevPermissions[role];
+    const userPermissions = permissions[currentUserRole] || [];
+    if (!userPermissions.includes("edit chat info")) {
+      toast.error("You do not have permission to edit chat permissions.", {
+        position: "top-right",
+        autoClose: 3000,
+      });
+      return;
+    }
 
-      if (rolePermissions.includes(action)) {
+    setChangedPermissions((prevPermissions) => {
+      const roleChanges = prevPermissions[role] || [];
+      if (roleChanges.includes(action)) {
         return {
           ...prevPermissions,
-          [role]: rolePermissions.filter((perm) => perm !== action),
+          [role]: roleChanges.filter((perm) => perm !== action),
         };
       } else {
         return {
           ...prevPermissions,
-          [role]: [...rolePermissions, action],
+          [role]: [...roleChanges, action],
         };
       }
     });
+
+    const rolePermissions = permissions[role] || [];
+    const updatedPermissions = rolePermissions.includes(action)
+      ? rolePermissions.filter((perm) => perm !== action)
+      : [...rolePermissions, action];
+
+    dispatch({
+      type: "UPDATE_PERMISSIONS",
+      payload: { role, updatedPermissions },
+    });
   };
 
+
   const handleDelete = async () => {
+    const deleteChatPermission = permissions[currentUserRole]?.includes("delete chat");
+
+    if (currentChat.Chat.chat_type === 'channel' && !deleteChatPermission) {
+      toast.error("You do not have permission to delete this chat!", {
+        position: "top-right",
+      });
+      return;
+    }
+
     try {
       const chatDeleteResponse = await deleteChat(currentChat.chat_id);
 
-      setChats(prev=>prev.filter(chat=>chat.chat_id!==currentChat.chat_id))
-      setchatInfoModalOpened(false)
-      setCurrentChat(null)
+      setChats((prev) => prev.filter((chat) => chat.chat_id !== currentChat.chat_id));
+      setchatInfoModalOpened(false);
+      dispatch({ type: "RESET_CURRENT_CHAT" })
       toast.success("Chat deleted successfully!", {
         position: "top-right",
       });
@@ -108,11 +148,20 @@ const ChatInfo = ({ currentChat,setCurrentChat, setMessages, setChats,setchatInf
   };
 
   const handleContinue = async () => {
+    console.log(changedPermissions);
+
     try {
       const permissionsResponse = await addRolePermissions(
         currentChat?.chat_id,
-        permissions
+        changedPermissions
       );
+
+      setChangedPermissions({
+        admin: [],
+        moderator: [],
+        member: [],
+      });
+
       setchatInfoModalOpened(false);
     } catch (error) {
       console.log("Error updating permissions:", error);
@@ -232,7 +281,11 @@ const ChatInfo = ({ currentChat,setCurrentChat, setMessages, setChats,setchatInf
                     type="checkbox"
                     checked={permissions.admin.includes(action)}
                     className="cursor-pointer"
-                    onChange={() => handlePermissionChange("admin", action)}
+                    disabled={currentChat?.Chat?.chat_type !== "channel"}
+                    onChange={() =>
+                      currentChat?.Chat?.chat_type === "channel" &&
+                      handlePermissionChange("admin", action)
+                    }
                   />
                 </div>
                 {/* Moderator Checkbox */}
@@ -241,7 +294,11 @@ const ChatInfo = ({ currentChat,setCurrentChat, setMessages, setChats,setchatInf
                     type="checkbox"
                     checked={permissions.moderator.includes(action)}
                     className="cursor-pointer"
-                    onChange={() => handlePermissionChange("moderator", action)}
+                    disabled={currentChat?.Chat?.chat_type !== "channel"}
+                    onChange={() =>
+                      currentChat?.Chat?.chat_type === "channel" &&
+                      handlePermissionChange("moderator", action)
+                    }
                   />
                 </div>
                 {/* Member Checkbox */}
@@ -250,7 +307,11 @@ const ChatInfo = ({ currentChat,setCurrentChat, setMessages, setChats,setchatInf
                     type="checkbox"
                     checked={permissions.member.includes(action)}
                     className="cursor-pointer"
-                    onChange={() => handlePermissionChange("member", action)}
+                    disabled={currentChat?.Chat?.chat_type !== "channel"}
+                    onChange={() =>
+                      currentChat?.Chat?.chat_type === "channel" &&
+                      handlePermissionChange("member", action)
+                    }
                   />
                 </div>
               </div>

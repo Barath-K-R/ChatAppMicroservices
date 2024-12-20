@@ -3,7 +3,6 @@ import { useSelector, useDispatch } from "react-redux";
 import { userApi } from "../api/UserApi.js";
 
 const useLogout = () => {
-  console.log("logout");
   const dispatch = useDispatch();
   const accessToken = useSelector((state) => state.tokens.accessToken);
   const refreshToken = useSelector((state) => state.tokens.refreshToken);

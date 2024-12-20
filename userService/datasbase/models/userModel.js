@@ -13,6 +13,11 @@ const UserModel = sequelize.define(
       type: DataTypes.STRING(70),
       allowNull: false,
     },
+    email: {
+      type: DataTypes.STRING(100),
+      allowNull: true,
+      unique: true,
+    },
     password: {
       type: DataTypes.STRING(70),
       allowNull: false,
@@ -24,12 +29,10 @@ const UserModel = sequelize.define(
     created_at: {
       type: DataTypes.DATE,
       defaultValue: DataTypes.NOW,
-      allowNull: false,
     },
     updated_at: {
       type: DataTypes.DATE,
       defaultValue: DataTypes.NOW,
-      allowNull: false,
     },
   },
   {

@@ -5,7 +5,7 @@ import dotenv from "dotenv";
 
 import sequelize from './config/databaseConnection.js'
 import organizationController from "./controllers/organizationController.js";
-import { createChannel } from "./utils/index.js";
+import { SubscribeMessage,createChannel} from "./utils/index.js";
 
 import OrganizationModel from "./datasbase/models/organizationModel.js";
 
@@ -26,7 +26,8 @@ app.use(express.urlencoded({ extended: true }));
         await sequelize.sync({ alter: true });
         console.log("All models were synchronized successfully.");
 
-
+        await SubscribeMessage();
+        
         app.listen(process.env.PORT, () => {
             console.log(`Server running successfully on port ${process.env.PORT || 8000}`);
         });

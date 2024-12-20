@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { BiGroup } from "react-icons/bi";
+import { useSelector,useDispatch } from "react-redux";
 import { unseenMessageCount } from "../api/messageApi.js";
-const  Conversations = ({ chat,currentChat, setCurrentChat, onlineUsers,currentUser }) => {
+const  Conversations = ({ chat,currentChat, onlineUsers,currentUser }) => {
   const [useronline, setuserOnline] = useState(false);
   const [unssenMessagesCount, setunssenMessagesCount] = useState(0)
 
+  const dispatch=useDispatch()
   useEffect(() => {
       if(currentChat===chat)
       setunssenMessagesCount(0);
@@ -37,8 +39,10 @@ const  Conversations = ({ chat,currentChat, setCurrentChat, onlineUsers,currentU
   
   return (
     <div
-      className="relative flex items-center justify-start bg-black bg-opacity-10 hover:bg-opacity-20 pl-4 gap-4 h-10 w-11/12 cursor-pointer rounded-lg"
-      onClick={() => setCurrentChat(chat)}
+      className="relative flex items-center justify-start text-white hover:bg-[#174b65] pl-4 gap-4 h-10 w-11/12 cursor-pointer rounded-lg"
+      onClick={() => {
+        dispatch({type:"SET_CURRENT_CHAT",payload:chat})
+      }}
     >
       {useronline && chat?.Chat?.chat_type === "direct" && (
         <div className="absolute h-[12px] w-[12px] bg-green-400 left-8 bottom-6 rounded-2xl"></div>

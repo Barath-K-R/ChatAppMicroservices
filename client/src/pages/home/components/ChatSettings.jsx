@@ -2,29 +2,31 @@ import React from "react";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
-import { leaveChat } from "../api/ChatApi.js";
+import { leaveChat } from "../../../api/ChatApi.js";
+import { useSelector } from "react-redux";
 const ChatSettings = ({
   chat,
   currentUser,
   setchatSettingsOpened,
   setchatInfoModalOpened,
 }) => {
-  
-  const handleLeave=async()=>{
-      try {
-        const leaveChatResponse=await leaveChat(chat.chat_id,currentUser.id)
-        toast.success("You have successfully left the chat.",{
-            position:'top-right'
-          });
-        
-      } catch (error) {
-        console.error("Error while leaving the chat:", error);
-        toast.error("Failed to leave the chat. Please try again.");
-      }
+
+
+  const handleLeave = async () => {
+    try {
+      const leaveChatResponse = await leaveChat(chat.chat_id, currentUser.id)
+      toast.success("You have successfully left the chat.", {
+        position: 'top-right'
+      });
+
+    } catch (error) {
+      console.error("Error while leaving the chat:", error);
+      toast.error("Failed to leave the chat. Please try again.");
+    }
   }
   return (
     <div
-      className="absolute w-28 right-8 top-6 p-2 shadow-md bg-white"
+      className="absolute w-28 right-8 top-6 p-2 shadow-md bg-white z-50"
       onMouseLeave={() => setchatSettingsOpened(false)}
     >
       <ul className="space-y-2">

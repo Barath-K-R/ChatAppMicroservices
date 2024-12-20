@@ -1,16 +1,19 @@
 import React, { useRef, useState, useEffect } from "react";
 
-import Conversations from "../components/Conversations.jsx";
-import ChatBox from "../components/ChatBox.jsx";
-import UserSearchModal from "../components/UserSearchModal.jsx";
-import CreateChatModal from "../components/CreateChatModal.jsx";
-import CreateChannelModal from "../components/CreateChannelModal.jsx";
+import Conversations from "../../components/Conversations.jsx";
+import ChatBox from "./components/ChatBox.jsx";
+import UserSearchModal from "./components/UserSearchModal.jsx";
+import CreateChatModal from "./components/CreateChatModal.jsx";
+import CreateChannelModal from "./components/CreateChannelModal.jsx";
+
+import { getAllUserChats } from "../../api/ChatApi.js";
 
 import { io } from "socket.io-client";
-import { userChats, createChat } from "../api/ChatApi.js";
-import { useSelector } from "react-redux";
+import { useSocket } from "../../context/SocketContext.js";
+
+import { userChats, createChat,getAllRoles } from "../../api/ChatApi.js";
+import { useSelector,useDispatch } from "react-redux";
 import { AiOutlinePlus } from "react-icons/ai";
-import "../styles/Home.css";
 
 const Home = () => {
   const [chats, setChats] = useState([]);
@@ -24,7 +27,6 @@ const Home = () => {
     scope: "",
   });
   const [onlineUsers, setOnlineUsers] = useState([]);
-  const [currentChat, setCurrentChat] = useState(null);
   const [sendMessage, setSendMessage] = useState(null);
   const [receivedMessage, setReceivedMessage] = useState(null);
   const [createChatModalOpened, setCreateChatModalOpened] = useState(false);
@@ -33,8 +35,10 @@ const Home = () => {
   const [selectedUsers, setselectedUsers] = useState([]);
   const [createChatSelection, setcreateChatSelection] = useState("");
 
+  const dispatch = useDispatch();
   const user = useSelector((state) => state.user.authUser);
-  const chatType = useSelector((state) => state.selection.selection);
+  const chatType = useSelector((state) => state.chats.chatSelection);
+  const currentChat=useSelector(state=>state.chats.currentChat)
   const socket = useRef();
 
   // Get the all chats of user
@@ -53,14 +57,20 @@ const Home = () => {
 
   // Connect to Socket.io
   useEffect(() => {
-    socket.current = io("http://localhost:8800");
-    socket.current.emit("new-user-add", user.id);
-    socket.current.on("get-users", (users) => {
-      setOnlineUsers(users);
-    });
-    return () => {
-      socket.current.disconnect();
-    };
+
+      socket.current= io('http://localhost:8800');
+      socket.current.emit("new-user-add", user.id);
+  
+      socket.current.on("get-users", (users) => {
+        console.log("Received users from server:", users);
+        setOnlineUsers(users);
+      });
+  
+      // Cleanup on unmount
+      return () => {
+        socket.current.off("get-users"); 
+        socket.current.disconnect(); 
+    }
   }, [user]);
 
   // Send Message to socket server
@@ -72,11 +82,35 @@ const Home = () => {
 
   // Get the message from socket server
   useEffect(() => {
+  
     socket.current.on("recieve-message", (data) => {
+      console.log(data);
+      console.log('MESSAGE RECIEVED')
       setReceivedMessage(data);
     });
+
+    const fetchAllUsers=async()=>{
+      try {
+        const userChats=await getAllUserChats(user.id)
+        console.log(userChats)
+        dispatch({type:"SET_USER_CHATS",payload:userChats.data})
+      } catch (error) {
+        console.log(error)
+      }
+    }
+
+    fetchAllUsers();
   }, []);
 
+  //fetching all roles
+  useEffect(() => {
+    const fethcAllRoles=async()=>{
+      const allRoles=await getAllRoles();
+      dispatch({type:"SET_ROLES",payload:allRoles.data})
+    };
+    fethcAllRoles();
+  }, [])
+  
   //creating new chat
   const handleCreateChat = async (groupName) => {
     try {
@@ -92,9 +126,9 @@ const Home = () => {
       };
 
       const response = await createChat(data);
-
+      console.log(response)
       setChats((prev) => [...prev, response.data.newChat]);
-      setCurrentChat(response.data.newChat);
+      dispatch({type:"SET_CURRENT_CHAT",payload:response.data.newChat})
       setUserSearchModal(false);
       setselectedUsers([]);
       setchatData((prev) => {
@@ -112,8 +146,8 @@ const Home = () => {
   };
 
   return (
-    <div className="outer-container flex w-full">
-      <div className="flex flex-col items-center relative w-56 pt-4 gap-4 bg-blue-900">
+    <div className="outer-container flex w-full h-full">
+      <div className="flex flex-col items-center relative w-56 pt-4 gap-4 bg-[#0a3244]">
         <section className="flex justify-center items-center p-2 gap-6">
           <span className="text-base text-white">Conversations </span>
           <div
@@ -138,7 +172,6 @@ const Home = () => {
             selectedUsers={selectedUsers}
             setselectedUsers={setselectedUsers}
             setUserSearchModal={setUserSearchModal}
-            setCurrentChat={setCurrentChat}
             createChatSelection={createChatSelection}
             handleCreateChat={handleCreateChat}
             setchatData={setchatData}
@@ -164,7 +197,6 @@ const Home = () => {
               currentUser={user}
               onlineUsers={onlineUsers}
               currentChat={currentChat}
-              setCurrentChat={setCurrentChat}
             />
           );
         })}
@@ -172,7 +204,8 @@ const Home = () => {
       {currentChat && (
         <ChatBox
           chat={currentChat}
-          setCurrentChat={setCurrentChat}
+          chats={chats}
+          socket={socket}
           setChats={setChats}
           chatType={chatType}
           setSendMessage={setSendMessage}
