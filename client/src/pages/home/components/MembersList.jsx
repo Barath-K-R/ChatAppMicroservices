@@ -140,15 +140,15 @@ const MembersList = ({
       });
       return;
     }
-
+    console.log(selectedUsers)
     try {
       const userIds = selectedUsers.map((user) => user.id);
-      const updatedChatMembers = await addMembersToChat(chat.chat_id, userIds);
-
-      if (updatedChatMembers) {
+      const addMembersResposne = await addMembersToChat(chat.chat_id, userIds);
+      if (addMembersResposne) {
         toast.success("Members were added successfully", {
           position: "top-right",
         });
+        dispatch({type:"ADD_CHAT_MEMBERS",payload:addMembersResposne.data.newMembersWithDetails})
         reset();
       }
     } catch (error) {
@@ -175,12 +175,9 @@ const MembersList = ({
         toast.success("Members were removed successfully", {
           position: "top-right",
         });
-        setchatMembers((prev) =>
-          prev.filter((member) => !userIds.includes(member.user_id))
-        );
+        dispatch({type:"REMOVE_CHAT_MEMBERS",payload:userIds})
         reset();
       }
-      // setfilteredMembers(prev=>prev.filter(member=>member.))
     } catch (error) {
       console.log(error);
     }

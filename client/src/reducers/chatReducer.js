@@ -49,6 +49,18 @@ export const chatReducer = (state = initialState, action) => {
         ...state,
         chatMembers: action.payload,
       };
+      case "ADD_CHAT_MEMBERS":
+        return {
+          ...state,
+          chatMembers: [...state.chatMembers, ...action.payload], 
+        };
+      case "REMOVE_CHAT_MEMBERS":
+        return {
+          ...state,
+          chatMembers: state.chatMembers.filter(
+            (member) => !action.payload.includes(member.user_id) 
+          ),
+        };
     case "SET_CURRENT_CHAT":
       return {
         ...state,
@@ -67,25 +79,25 @@ export const chatReducer = (state = initialState, action) => {
         ...state,
         currentChat: null,
       };
-      case "UPDATE_MEMBER_ROLE":
-        const { userId, newRole } = action.payload;
-        console.log(userId + " " + newRole);
-      
-        return {
-          ...state,
-          chatMembers: state.chatMembers.map((member) =>
-            member.user_id === userId
-              ? {
-                  ...member,
-                  role_id: newRole.id, 
-                  Role: {
-                    ...member.Role,
-                    name: newRole, 
-                  },
-                }
-              : member
-          ),
-        };
+    case "UPDATE_MEMBER_ROLE":
+      const { userId, newRole } = action.payload;
+      console.log(userId + " " + newRole);
+
+      return {
+        ...state,
+        chatMembers: state.chatMembers.map((member) =>
+          member.user_id === userId
+            ? {
+              ...member,
+              role_id: newRole.id,
+              Role: {
+                ...member.Role,
+                name: newRole,
+              },
+            }
+            : member
+        ),
+      };
     case "PIN_MESSAGE":
       console.log(state.pinnedMessages);
       return {

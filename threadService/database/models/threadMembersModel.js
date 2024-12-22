@@ -1,5 +1,6 @@
 import sequelize from "../../config/databaseConnection.js";
 import { DataTypes } from "sequelize";
+import ThreadModel from "./threadModel.js";
 
 const ThreadMembersModel = sequelize.define(
   "ThreadMembers",
@@ -12,6 +13,11 @@ const ThreadMembersModel = sequelize.define(
     thread_id: {
       type: DataTypes.INTEGER,
       allowNull: false,
+      references: {
+        model: ThreadModel, 
+        key: "id", 
+      },
+      onDelete: "CASCADE",
     },
     user_id: {
       type: DataTypes.INTEGER,

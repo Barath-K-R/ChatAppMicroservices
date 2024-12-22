@@ -29,7 +29,7 @@ const ChatModel = sequelize.define(
       defaultValue: "open",
     },
     scope: {
-      type: DataTypes.ENUM("personal", "team", "organization"),
+      type: DataTypes.ENUM("personal", "organization"),
       allowNull: false,
       defaultValue: "organization",
     },

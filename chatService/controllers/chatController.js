@@ -2,10 +2,10 @@ import * as chatService from '../services/chatService.js';
 
 const chatController = (app) => {
   app.post("/", async (req, res) => {
-    const { currentUserId, userIds, chatType, name, description, visibility, scope } = req.body;
-    console.log('req='+req.body);
+    const { currentUserId, userIds, chatType, name, description, visibility, scope, organization_id } = req.body;
+    console.log('req=' + req.body);
     try {
-      const result = await chatService.createChat(currentUserId, userIds, chatType, name, description, visibility, scope);
+      const result = await chatService.createChat(currentUserId, userIds, chatType, name, description, visibility, scope, organization_id);
       res.send(result);
     } catch (error) {
       console.error(error);
@@ -79,7 +79,9 @@ const chatController = (app) => {
 
   app.post("/:chatId/members", async (req, res) => {
     const { chatId } = req.params;
-    const { userIds } = req.body;
+    const userIds = req.body;
+    console.log(req.body);
+    console.log(chatId + ' ' + userIds);
     try {
       const result = await chatService.addMembersToChat(chatId, userIds);
       res.status(200).send(result);
@@ -136,6 +138,8 @@ const chatController = (app) => {
     }
   });
 
+
+
   app.put("/:chatId/roles/:userId", async (req, res) => {
     const { chatId, userId } = req.params;
     const { role } = req.body;
@@ -162,6 +166,23 @@ const chatController = (app) => {
     } catch (error) {
       console.error("Error leaving chat:", error);
       res.status(500).json({ message: "Failed to leave chat" });
+    }
+  });
+
+  app.post("/:threadId/convert-to-group", async (req, res) => {
+    const { threadId } = req.params;
+    const { name, description, currentUserId, organization_id } = req.body;
+
+    if (!name || !description || !currentUserId || !organization_id) {
+      return res.status(400).send({ error: "Missing required fields" });
+    }
+
+    try {
+      const result = await chatService.convertThreadToGroup(threadId, name, description, currentUserId, organization_id);
+      res.status(200).json(result);
+    } catch (error) {
+      console.error("Error in converting thread to group:", error);
+      res.status(500).json({ error: "Failed to convert thread to group." });
     }
   });
 };

@@ -38,6 +38,35 @@ const threadController = (app) => {
       return res.status(500).json({ error: "Failed to convert thread to chat." });
     }
   });
+
+  app.get("/:threadId/members", async (req, res) => {
+    const { threadId } = req.params;
+    try {
+      const response = await threadService.getThreadMembers(threadId);
+      return res.status(200).json(response);
+    } catch (error) {
+      console.error("Error in getThreadMembers controller:", error);
+      return res.status(500).json({ error: "Failed to fetch thread members." });
+    }
+  });
+  app.post("/:threadId/members", async (req, res) => {
+    const { threadId } = req.params; 
+    const { userIds } = req.body;    
+
+
+    if (!Array.isArray(userIds) || userIds.length === 0) {
+      return res.status(400).json({ error: "userIds should be a non-empty array." });
+    }
+
+    try {
+  
+      const response = await threadService.addMembersToThread(threadId, userIds);
+      return res.status(201).json(response);
+    } catch (error) {
+      console.error("Error in addMembersToThread controller:", error);
+      return res.status(500).json({ error: "Failed to add members to thread." });
+    }
+  });
 };
 
 export default threadController;

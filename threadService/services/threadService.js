@@ -66,7 +66,7 @@ export const createThread = async (chatId, sender_id, head, userIds, message) =>
 
     await publishMessage("message_create", { chatId, sender_id, message, thread_id: thread.id });
 
-    return { message: "Thread and message created successfully" };
+    return {newThread:thread, message: "Thread and message created successfully" };
 };
 
 
@@ -85,6 +85,55 @@ export const addMessageToThread = async (thread_id, sender_id, message, chatId) 
     await publishMessage("message_create", { chatId, sender_id, message, thread_id });
 
     return { message: "Thread message created successfully" };
+};
+
+export const getThreadMembers = async (threadId) => {
+   
+    try {
+        const threadMembers = await threadRepository.getThreadMembersByThreadId(threadId);
+        console.log(threadMembers);
+        if (threadMembers.length === 0) {
+            return { message: "No members found for this thread." };
+        }
+        return  threadMembers;
+    } catch (error) {
+        console.error("Error in getThreadMembers service:", error);
+        throw error;
+    }
+};
+
+export const addMembersToThread = async (threadId, userIds) => {
+    try {
+      const addedMembers = await threadRepository.addMembersToThread(threadId, userIds);
+  
+      return addedMembers;
+    } catch (error) {
+      console.error("Error in addMembersToThread service:", error);
+      throw new Error("Failed to add members to thread.");
+    }
+  };
+
+export const subscribeEvents = async (msg) => {
+    const channel = await createChannel();
+
+    try {
+        const {threadId}= JSON.parse(msg.content);
+        console.log(threadId);
+        const members = await getThreadMembers(threadId);
+        const { replyTo, correlationId } = msg.properties;
+
+        if (replyTo && correlationId) {
+            channel.sendToQueue(replyTo, Buffer.from(JSON.stringify(members)), {
+                correlationId,
+            });
+        }
+
+        channel.ack(msg);
+
+    } catch (error) {
+        console.error("Error processing message:", error);
+        channel.nack(msg, false, true);
+    }
 };
 
 const generateUuid = () => {

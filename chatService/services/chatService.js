@@ -5,7 +5,7 @@ import dotenv from 'dotenv'
 
 dotenv.config()
 
-export const createChat = async (currentUserId, userIds, chatType, name, description, visibility, scope) => {
+export const createChat = async (currentUserId, userIds, chatType, name, description, visibility, scope, organization_id) => {
     try {
         let chatExists;
 
@@ -22,15 +22,15 @@ export const createChat = async (currentUserId, userIds, chatType, name, descrip
         let newChat;
 
         if (chatType === "direct") {
-            newChat = await chatRepository.createDirectChat(currentUserId, userIds[0]);
+            newChat = await chatRepository.createDirectChat(currentUserId, userIds[0], organization_id);
         } else if (chatType === "group") {
-            newChat = await chatRepository.createGroupChat(currentUserId, userIds, name, description);
+            newChat = await chatRepository.createGroupChat(currentUserId, userIds, name, description, organization_id);
         } else {
-            newChat = await chatRepository.createChannelChat(currentUserId, userIds, name, description, visibility, scope);
+            newChat = await chatRepository.createChannelChat(currentUserId, userIds, name, description, visibility, scope, organization_id);
             await chatRepository.addPermissionsToChat(newChat.chat_id)
         }
 
-       
+
         return { newChat, message: "New chat created and users added successfully" };
     } catch (error) {
         console.error("Error creating chat:", error);
@@ -51,6 +51,69 @@ export const deleteChat = async (chatId) => {
     }
 };
 
+export const convertThreadToGroup = async (threadId, name, description, currentUserId, organization_id) => {
+    console.log('entered into service');
+    try {
+        const channel = await createChannel();
+        const responseQueue = await channel.assertQueue("", { exclusive: true });
+        const correlationId = generateUuid();
+
+        let threadMembers;
+
+        channel.consume(
+            responseQueue.queue,
+            (msg) => {
+                if (msg.properties.correlationId === correlationId) {
+                    threadMembers = JSON.parse(msg.content.toString());
+                }
+            },
+            { noAck: true }
+        );
+
+        // Publish the request to fetch thread members
+        channel.publish(
+            process.env.EXCHANGE_NAME,
+            "fetch_thread_members",
+            Buffer.from(JSON.stringify({threadId})),
+            {
+                replyTo: responseQueue.queue,
+                correlationId,
+            }
+        );
+
+        // Wait for the thread members response
+        await new Promise((resolve, reject) => {
+            const timeout = setTimeout(() => reject(new Error("Timeout waiting for thread members")), 2000);
+            const interval = setInterval(() => {
+                if (threadMembers) {
+                    clearTimeout(timeout);
+                    clearInterval(interval);
+                    resolve();
+                }
+            }, 100);
+        });
+
+        console.log(threadMembers);
+        if (threadMembers) {
+            const userIds = threadMembers.map(member => member.user_id).filter(id => id !== currentUserId);
+
+            console.log(userIds);
+            const newGroup = await chatRepository.createGroupChat(
+                currentUserId,
+                userIds,
+                name,
+                description,
+                organization_id,
+            );
+
+            return newGroup;
+        }
+
+    } catch (error) {
+        console.error("Error converting thread to group:", error);
+        throw new Error("Failed to convert thread to group.");
+    }
+};
 export const getChatMembers = async (chatId) => {
     if (!chatId) {
         return { error: "Missing chatId parameter" };
@@ -304,13 +367,16 @@ export const addMembersToChat = async (chatId, userIds) => {
             return { status: 500, error: "Failed to validate users" };
         }
 
+        console.log(chat.chat_type);
 
         const fetchedUserIds = userDetails?.map(user => user.id) || [];
         if (fetchedUserIds.length !== userIds.length) {
             return { status: 404, error: "One or more users not found" };
         }
 
-        const roleId = await chatRepository.getRoleIdByName("member");
+        let roleId = null;
+        if (chat.chat_type === 'channel')
+            roleId = await chatRepository.getRoleIdByName("member");
         const membersToAdd = userIds.map(userId => ({
             chat_id: chatId,
             user_id: userId,
@@ -318,7 +384,19 @@ export const addMembersToChat = async (chatId, userIds) => {
         }));
 
         const newMembers = await chatRepository.addMembersToChatInRepo(membersToAdd);
-        return { newMembers, message: "Members added successfully" };
+
+        const roles = await chatRepository.getAllRoles();
+        const newMembersWithDetails = newMembers.map(member => {
+            const userDetail = userDetails.find(user => user.id === member.user_id) || {};
+            const roleDetail = roles.find(role => role.id === member.role_id) || {};
+
+            return {
+                ...member.toJSON(),
+                User: userDetail || null,
+                Role: roleDetail || null,
+            };
+        });
+        return { newMembersWithDetails, message: "Members added successfully" };
 
     } catch (error) {
         console.error("Error adding members:", error);
@@ -437,14 +515,14 @@ export const getAllRolePermissions = async (chatId) => {
 
 export const updateUserRole = async (chatId, userId, role) => {
     try {
-      const updatedRole = await chatRepository.updateRole(chatId, userId, role);
-      return updatedRole;
+        const updatedRole = await chatRepository.updateRole(chatId, userId, role);
+        return updatedRole;
     } catch (error) {
-      throw new Error('Error updating user role: ' + error.message);
+        throw new Error('Error updating user role: ' + error.message);
     }
-  };
+};
 
-  
+
 export const updateRolePermissions = async (chatId, permissions) => {
     console.log(permissions);
     try {

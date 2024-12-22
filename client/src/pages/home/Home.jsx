@@ -62,7 +62,7 @@ const Home = () => {
       socket.current.emit("new-user-add", user.id);
   
       socket.current.on("get-users", (users) => {
-        console.log("Received users from server:", users);
+    
         setOnlineUsers(users);
       });
   
@@ -84,15 +84,14 @@ const Home = () => {
   useEffect(() => {
   
     socket.current.on("recieve-message", (data) => {
-      console.log(data);
-      console.log('MESSAGE RECIEVED')
+
       setReceivedMessage(data);
     });
 
     const fetchAllUsers=async()=>{
       try {
         const userChats=await getAllUserChats(user.id)
-        console.log(userChats)
+  
         dispatch({type:"SET_USER_CHATS",payload:userChats.data})
       } catch (error) {
         console.log(error)
@@ -126,7 +125,7 @@ const Home = () => {
       };
 
       const response = await createChat(data);
-      console.log(response)
+ 
       setChats((prev) => [...prev, response.data.newChat]);
       dispatch({type:"SET_CURRENT_CHAT",payload:response.data.newChat})
       setUserSearchModal(false);

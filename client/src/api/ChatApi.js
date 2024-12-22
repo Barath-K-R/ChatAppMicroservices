@@ -72,6 +72,7 @@ chatApi.interceptors.response.use(
 export const createChat = (chatData) => chatApi.post("/", chatData);
 export const deleteChat=(chatId)=>chatApi.delete(`/${chatId}`)
 export const leaveChat=(chatId,userId)=>chatApi.delete(`/${chatId}/leave/${userId}`)
+export const convertThreadToGroup=(threadId,newGroupData)=>chatApi.post(`/${threadId}/convert-to-group`,newGroupData)
 
 export const getAllUserChats=(userId)=>chatApi.get(`/${userId}/all-chats`)
 export const userChats = (id, chatType) =>

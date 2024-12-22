@@ -30,6 +30,7 @@ export const addMembersToThread = async (thread_id, userIds) => {
 };
 
 export const getThreadMembersByThreadId = async (threadId) => {
+
     try {
         const threadMembers = await ThreadMembersModel.findAll({
             where: { thread_id: threadId },
@@ -37,7 +38,7 @@ export const getThreadMembersByThreadId = async (threadId) => {
         });
         return threadMembers;
     } catch (error) {
-        console.error("Error fetching thread members:", error);
+        console.error("Error fetching thread members from DB:", error);
         throw error;
     }
 };

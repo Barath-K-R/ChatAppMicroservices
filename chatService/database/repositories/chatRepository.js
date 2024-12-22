@@ -65,6 +65,7 @@ export const createDirectChat = async (currentUserId, otherUserId) => {
 
         const newChat = await ChatModel.create({
             chat_type: "direct",
+            organization_id
         });
 
         await ChatMembersModel.bulkCreate([
@@ -89,21 +90,22 @@ export const createDirectChat = async (currentUserId, otherUserId) => {
     }
 };
 
-export const createGroupChat = async (currentUserId, userIds, name, description) => {
+export const createGroupChat = async (currentUserId, userIds, name, description,organization_id) => {
     try {
         const newGroup = await ChatModel.create({
             chat_type: "group",
             name,
             description,
+            organization_id
         });
-
+        console.log(newGroup.id);
         const groupMembers = userIds.map((user) => ({
             chat_id: newGroup.id,
             user_id: user,
             role_id: null,
         }));
         groupMembers.push({ chat_id: newGroup.id, user_id: currentUserId, role_id: null });
-
+        console.log(groupMembers);
         await ChatMembersModel.bulkCreate(groupMembers);
 
         const newGroupWithMembers = await ChatMembersModel.findOne({
@@ -134,6 +136,7 @@ export const createChannelChat = async (currentUserId, userIds, name, descriptio
             description,
             visibility,
             scope,
+            organization_id
         });
 
         const channelMembers = userIds.map((user) => ({
@@ -295,10 +298,6 @@ export const getChatMembersByChatId = async (chatId) => {
         const chatMembers = await ChatMembersModel.findAll({
             where: { chat_id: chatId },
             include: [
-                // {
-                //     model: UserModel,
-                //     attributes: ["id", "username"],
-                // },
                 {
                     model: RoleModel,
                     attributes: ["name"],

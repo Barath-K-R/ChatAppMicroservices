@@ -43,8 +43,9 @@ const MessageActionModal = ({
         position: "top-right",
         autoClose: 3000,
       });
+      return;
     }
-    setExpandedThreadHead(message);
+    setExpandedThreadHead({...message, is_thread_head: true});
     setreplyThread("new");
     setMessages((prev) => {
       return prev.map((msg) => {

@@ -1,5 +1,6 @@
 import amqplib from 'amqplib';
 import dotenv from 'dotenv';
+import { subscribeEvents } from '../services/threadService.js';
 
 dotenv.config();
 
@@ -31,7 +32,9 @@ export const createChannel = async () => {
 
         channel = await connection.createChannel();
         await channel.assertExchange(process.env.EXCHANGE_NAME, "direct", { durable: true });
-        console.log("RabbitMQ channel created");
+        
+        await channel.assertQueue('fetch_thread_members_queue', { durable: true });
+        await channel.bindQueue('fetch_thread_members_queue', process.env.EXCHANGE_NAME, 'fetch_thread_members');
         return channel;
 
     } catch (err) {
@@ -65,3 +68,17 @@ export const publishMessage = async (routingKey, message) => {
 };
 
 
+export const SubscribeMessage = async () => {
+    const channel = await createChannel(); 
+
+
+    channel.consume(
+        'fetch_thread_members_queue',
+        (msg) => {
+            if (msg && msg.content) {
+                subscribeEvents(msg); 
+            }
+        },
+        { noAck: false } 
+    );
+};
