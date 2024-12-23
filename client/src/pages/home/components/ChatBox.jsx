@@ -24,7 +24,7 @@ import {
   getAllRolePermissions
 } from "../../../api/ChatApi.js";
 import { getMessages, addMessage, createReadReciept, updateReadReciepts } from '../../../api/messageApi.js'
-import { addMessageToThread, createThread,getThreadMembers,addMembersToThread} from "../../../api/threadApi.js";
+import { addMessageToThread, createThread, getThreadMembers, addMembersToThread, getThreadByUser } from "../../../api/threadApi.js";
 import GroupNameModal from "./GroupNameModal.jsx";
 const ChatBox = ({
   chat,
@@ -54,7 +54,7 @@ const ChatBox = ({
   const [activeMessageId, setActiveMessageId] = useState(null);
 
   const messagesEndRef = useRef(null);
-  const threadMembersCache = useRef({});
+  const userThreads = useRef([]);
 
   const dispatch = useDispatch()
   const chatMembers = useSelector(state => state.chats.chatMembers)
@@ -242,7 +242,15 @@ const ChatBox = ({
 
   }, [currentChat]);
 
-
+  //fetching all threads of currentuser
+  useEffect(() => {
+    const fetchAllThreadsOfUser=async()=>{
+      const threads=await getThreadByUser(currentUser.id);
+      userThreads.current=threads.data.map(thread=>thread.thread_id);
+    }
+    fetchAllThreadsOfUser();
+  }, [currentChat])
+  
 
   //handling sent messages
   const handleSend = async (e) => {
@@ -406,9 +414,19 @@ const ChatBox = ({
     }
   }, [socket]);
 
-  const handleReplyThread = () => {
-    setreplyThread("old")
-  }
+  const handleReplyThread = async (threadId) => {
+    try {
+ 
+      if (!userThreads.current.includes(threadId)) {
+        userThreads.current.push(threadId); 
+  
+        const response = await addMembersToThread(threadId, [currentUser.id]);
+        console.log("User added to thread successfully:", response);
+      }
+    } catch (error) {
+      console.error("Error in handleReplyThread:", error);
+    }
+  };
 
   return (
     <div className="flex flex-col relative h-screen w-full bg-slate-100 z-0">
@@ -546,7 +564,10 @@ const ChatBox = ({
                     />
                     <button
                       className="h-7 w-14 bg-blue-500 hover:bg-blue-600 rounded-md"
-                      onClick={handleSend}
+                      onClick={()=>{
+                        handleSend()
+                        handleReplyThread(message?.thread_id)
+                      }}
                     >
                       Send
                     </button>
@@ -565,7 +586,7 @@ const ChatBox = ({
                       <CgMailReply
                         size={17}
                         className="hover:text-blue-400 cursor-pointer"
-                        onClick={handleReplyThread}
+                        onClick={()=>setreplyThread("old")}
                       />
                       <BiMessageAltAdd className="hover:text-blue-400 cursor-pointer" onClick={() => setSelectedThreadId(message?.thread_id)} />
                     </section>
@@ -622,4 +643,4 @@ const ChatBox = ({
   );
 };
 
-export default ChatBox;
+export default React.memo(ChatBox);

@@ -98,14 +98,12 @@ export const createGroupChat = async (currentUserId, userIds, name, description,
             description,
             organization_id
         });
-        console.log(newGroup.id);
         const groupMembers = userIds.map((user) => ({
             chat_id: newGroup.id,
             user_id: user,
             role_id: null,
         }));
         groupMembers.push({ chat_id: newGroup.id, user_id: currentUserId, role_id: null });
-        console.log(groupMembers);
         await ChatMembersModel.bulkCreate(groupMembers);
 
         const newGroupWithMembers = await ChatMembersModel.findOne({
@@ -125,7 +123,7 @@ export const createGroupChat = async (currentUserId, userIds, name, description,
     }
 };
 
-export const createChannelChat = async (currentUserId, userIds, name, description, visibility, scope) => {
+export const createChannelChat = async (currentUserId, userIds, name, description, visibility, scope,organization_id) => {
     try {
         const adminRoleId = await getRoleIdByName('admin');
         const memberRoleId = await getRoleIdByName('member');

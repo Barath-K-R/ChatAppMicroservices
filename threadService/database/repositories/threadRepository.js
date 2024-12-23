@@ -34,6 +34,12 @@ export const getThreadMembersByThreadId = async (threadId) => {
     try {
         const threadMembers = await ThreadMembersModel.findAll({
             where: { thread_id: threadId },
+            include: [
+                {
+                    model: ThreadModel,
+                    attributes: ["id", "chat_id"], 
+                }
+            ],
             attributes: ["user_id"],
         });
         return threadMembers;
@@ -43,19 +49,44 @@ export const getThreadMembersByThreadId = async (threadId) => {
     }
 };
 
-export const deleteThread = async (threadId) => {
+export const deleteThreadById = async (threadId) => {
     try {
-        await ThreadMembersModel.destroy({
-            where: { thread_id: threadId },
-        });
-
-        await ThreadModel.destroy({
+        const result = await ThreadModel.destroy({
             where: { id: threadId },
         });
 
-        return { message: "Thread and related data have been deleted successfully." };
+        return result > 0; 
     } catch (error) {
-        console.error("Error deleting thread:", error);
+        console.error("Error in deleteThreadById repository:", error);
+        throw new Error("Database error while deleting thread.");
+    }
+};
+
+export const findThreadsByUserId = async (userId) => {
+    try {
+      const threads = await ThreadMembersModel.findAll({
+        where: { user_id: userId },
+        attributes: ["thread_id"],
+      });
+      return threads;
+    } catch (error) {
+      throw new Error("Error fetching threads from database: " + error.message);
+    }
+  };
+
+  export const getThreadById = async (threadId) => {
+    try {
+        const thread = await ThreadModel.findOne({
+            where: { id: threadId },
+        });
+
+        if (!thread) {
+            throw new Error(`Thread with id ${threadId} not found.`);
+        }
+
+        return thread;
+    } catch (error) {
+        console.error("Error fetching thread by ID:", error);
         throw error;
     }
 };

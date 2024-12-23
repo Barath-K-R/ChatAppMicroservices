@@ -6,10 +6,11 @@ import dotenv from "dotenv";
 import sequelize from './config/databaseConnection.js'
 
 import threadController from "./controllers/threadControler.js";
-import { createChannel,SubscribeMessage} from "./utils/index.js";
+import { createChannel, SubscribeMessage } from "./utils/index.js";
 
 import ThreadModel from "./database/models/threadModel.js";
 import ThreadMembersModel from './database/models/threadMembersModel.js'
+import {setUpAssoaciations} from './database/models/associations.js'
 
 dotenv.config();
 
@@ -28,6 +29,7 @@ app.use(express.urlencoded({ extended: true }));
         await sequelize.sync({ alter: true });
         console.log("All models were synchronized successfully.");
 
+        setUpAssoaciations()
         SubscribeMessage()
         app.listen(process.env.PORT, () => {
             console.log(`Server running successfully on port ${process.env.PORT || 5000}`);
@@ -39,7 +41,7 @@ app.use(express.urlencoded({ extended: true }));
     }
 })();
 
-   
+
 threadController(app)
 
 

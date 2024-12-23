@@ -61,4 +61,4 @@ const  Conversations = ({ chat,currentChat, onlineUsers,currentUser }) => {
   );
 };
 
-export default Conversations;
+export default React.memo(Conversations);

@@ -162,4 +162,4 @@ const UserSearchModal = ({
   );
 };
 
-export default UserSearchModal;
+export default React.memo(UserSearchModal);

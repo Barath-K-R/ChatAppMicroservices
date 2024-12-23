@@ -2,7 +2,6 @@
 import * as chatRepository from '../database/repositories/chatRepository.js';
 import { publishMessage, createChannel } from '../utils/index.js';
 import dotenv from 'dotenv'
-
 dotenv.config()
 
 export const createChat = async (currentUserId, userIds, chatType, name, description, visibility, scope, organization_id) => {
@@ -74,7 +73,7 @@ export const convertThreadToGroup = async (threadId, name, description, currentU
         channel.publish(
             process.env.EXCHANGE_NAME,
             "fetch_thread_members",
-            Buffer.from(JSON.stringify({threadId})),
+            Buffer.from(JSON.stringify({ threadId })),
             {
                 replyTo: responseQueue.queue,
                 correlationId,
@@ -106,6 +105,9 @@ export const convertThreadToGroup = async (threadId, name, description, currentU
                 organization_id,
             );
 
+            console.log(threadMembers[0].Thread.chat_id);
+            await publishMessage("delete_thread", { threadId });
+            await publishMessage("message_convert", { oldChatId: threadMembers[0].Thread.chat_id, newChatId: newGroup.chat_id });
             return newGroup;
         }
 
@@ -114,6 +116,7 @@ export const convertThreadToGroup = async (threadId, name, description, currentU
         throw new Error("Failed to convert thread to group.");
     }
 };
+
 export const getChatMembers = async (chatId) => {
     if (!chatId) {
         return { error: "Missing chatId parameter" };

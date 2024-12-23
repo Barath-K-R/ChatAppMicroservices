@@ -3,7 +3,7 @@ import * as chatService from '../services/chatService.js';
 const chatController = (app) => {
   app.post("/", async (req, res) => {
     const { currentUserId, userIds, chatType, name, description, visibility, scope, organization_id } = req.body;
-    console.log('req=' + req.body);
+
     try {
       const result = await chatService.createChat(currentUserId, userIds, chatType, name, description, visibility, scope, organization_id);
       res.send(result);

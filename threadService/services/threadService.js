@@ -66,9 +66,8 @@ export const createThread = async (chatId, sender_id, head, userIds, message) =>
 
     await publishMessage("message_create", { chatId, sender_id, message, thread_id: thread.id });
 
-    return {newThread:thread, message: "Thread and message created successfully" };
+    return { newThread: thread, message: "Thread and message created successfully" };
 };
-
 
 export const addMessageToThread = async (thread_id, sender_id, message, chatId) => {
     if (!thread_id || !sender_id || !message || !chatId) {
@@ -88,14 +87,14 @@ export const addMessageToThread = async (thread_id, sender_id, message, chatId) 
 };
 
 export const getThreadMembers = async (threadId) => {
-   
+    console.log(threadId);
     try {
         const threadMembers = await threadRepository.getThreadMembersByThreadId(threadId);
         console.log(threadMembers);
         if (threadMembers.length === 0) {
             return { message: "No members found for this thread." };
         }
-        return  threadMembers;
+        return threadMembers;
     } catch (error) {
         console.error("Error in getThreadMembers service:", error);
         throw error;
@@ -104,37 +103,83 @@ export const getThreadMembers = async (threadId) => {
 
 export const addMembersToThread = async (threadId, userIds) => {
     try {
-      const addedMembers = await threadRepository.addMembersToThread(threadId, userIds);
-  
-      return addedMembers;
-    } catch (error) {
-      console.error("Error in addMembersToThread service:", error);
-      throw new Error("Failed to add members to thread.");
-    }
-  };
+        const addedMembers = await threadRepository.addMembersToThread(threadId, userIds);
 
-export const subscribeEvents = async (msg) => {
+        return addedMembers;
+    } catch (error) {
+        console.error("Error in addMembersToThread service:", error);
+        throw new Error("Failed to add members to thread.");
+    }
+};
+
+export const getThreadsByUser = async (userId) => {
+    try {
+        const threads = await threadRepository.findThreadsByUserId(userId);
+        return threads;
+    } catch (error) {
+        throw new Error("Error fetching threads for user: " + error.message);
+    }
+};
+
+export const deleteThread = async (threadId) => {
+    if (!threadId) {
+        throw new Error("Thread ID is required.");
+    }
+    
+    try {
+        const thread = await threadRepository.getThreadById(threadId);
+        if (!thread) {
+            throw new Error("Thread not found.");
+        }
+
+        const deletionResult = await threadRepository.deleteThreadById(threadId);
+    } catch (error) {
+        console.error("Error in deleteThread service:", error);
+        throw new Error("Failed to delete thread.");
+    }
+};
+
+export const subscribeEvents = async (msg, event) => {
     const channel = await createChannel();
 
     try {
-        const {threadId}= JSON.parse(msg.content);
-        console.log(threadId);
-        const members = await getThreadMembers(threadId);
-        const { replyTo, correlationId } = msg.properties;
+        const payload = JSON.parse(msg.content); 
 
-        if (replyTo && correlationId) {
-            channel.sendToQueue(replyTo, Buffer.from(JSON.stringify(members)), {
-                correlationId,
-            });
+        switch (event) {
+            case "fetch_thread_members":
+                {
+                    const { threadId } = payload;
+                    console.log("Fetching members for thread:", threadId);
+                    const members = await getThreadMembers(threadId);
+
+                    const { replyTo, correlationId } = msg.properties;
+                    if (replyTo && correlationId) {
+                        channel.sendToQueue(replyTo, Buffer.from(JSON.stringify(members)), {
+                            correlationId,
+                        });
+                    }
+                }
+                break;
+
+            case "delete_thread":
+                {
+                    const { threadId } = payload;
+                    console.log("Deleting thread:", threadId);
+                    await deleteThread(threadId);
+                }
+                break;
+
+            default:
+                console.warn("Unhandled event type:", event);
         }
 
         channel.ack(msg);
-
     } catch (error) {
-        console.error("Error processing message:", error);
-        channel.nack(msg, false, true);
+        console.error(`Error processing event (${event}):`, error);
+        channel.nack(msg, false, true); 
     }
 };
+
 
 const generateUuid = () => {
     return (

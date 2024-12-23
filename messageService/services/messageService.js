@@ -27,7 +27,7 @@ export const getChatMessages = async (chatId) => {
     if (messages.length === 0)
       return [];
 
-    
+
     const messageUserIds = messages.map((message) => message.dataValues.sender_id);
     const reactionUserIds = messages.flatMap((message) =>
       message.MessageReactions.map((reaction) => reaction.userId)
@@ -120,6 +120,25 @@ export const getChatMessages = async (chatId) => {
   }
 };
 
+export const updateMessagesForGroup = async (oldChatId, newChatId) => {
+  console.log('UPDATING MESSAGES');
+  console.log(oldChatId+' '+newChatId);
+  try {
+    const updatedCount = await messageRepository.updateMessagesForGroupConversion(oldChatId, newChatId);
+
+    if (updatedCount === 0) {
+      console.warn("No messages were updated during the conversion.");
+    }
+
+    return {
+      message: `Successfully updated ${updatedCount} messages for group conversion.`,
+      updatedMessages: updatedCount,
+    };
+  } catch (error) {
+    console.error("Error updating messages for group conversion:", error);
+    throw new Error("Failed to update messages for group conversion.");
+  }
+};
 
 export const deleteChatMessages = async (chatId) => {
   try {
@@ -132,6 +151,7 @@ export const deleteChatMessages = async (chatId) => {
     throw new Error("Failed to delete messages.");
   }
 };
+
 
 export const getReactions = async (messageId) => {
   try {
@@ -266,11 +286,12 @@ export const updateReadReceipts = async (messageIds, userId, date) => {
   }
 };
 
-export const subscribeEvents = async (msg,eventType) => {
+export const subscribeEvents = async (msg, eventType) => {
+  console.log(eventType);
   try {
     if (msg && msg.content) {
       const messageContent = JSON.parse(msg.content.toString());
-      
+
       const { messageId } = messageContent;
       switch (eventType) {
         case 'message_create':
@@ -314,6 +335,11 @@ export const subscribeEvents = async (msg,eventType) => {
           console.log('fetched');
           console.log(messageContent);
           userDetails = messageContent;
+          break;
+        case 'message_convert':
+          console.log(messageContent);
+          const { oldChatId, newChatId } = messageContent;
+          const conversionResult = await updateMessagesForGroup(oldChatId, newChatId);
           break;
         default:
           console.log(`Unhandled routing key: ${routingKey}`);

@@ -35,11 +35,12 @@ export const createChannel = async () => {
     await channel.assertQueue('message_find_queue', { durable: true });
     await channel.assertQueue('message_update_queue', { durable: true });
     await channel.assertQueue('message_create_queue', { durable: true });
+    await channel.assertQueue('message_convert_queue', { durable: true });
     
     await channel.bindQueue('message_find_queue', process.env.EXCHANGE_NAME, 'message_find');
     await channel.bindQueue('message_update_queue', process.env.EXCHANGE_NAME, 'message_update');
     await channel.bindQueue('message_create_queue', process.env.EXCHANGE_NAME, 'message_create');
-    
+    await channel.bindQueue('message_convert_queue', process.env.EXCHANGE_NAME, 'message_convert');
 
 
     return channel;
@@ -77,6 +78,7 @@ export const SubscribeMessage = async () => {
     { queue: 'message_create_queue', event: 'message_create' },
     { queue: 'message_update_queue', event: 'message_update' },
     { queue: 'message_find_queue', event: 'message_find' },
+    { queue: 'message_convert_queue', event: 'message_convert' },
   ];
 
   queues.forEach(({ queue, event }) => {

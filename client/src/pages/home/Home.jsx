@@ -122,6 +122,7 @@ const Home = () => {
         description: chatData.description,
         visibility: chatData.visibility,
         scope: chatData.scope,
+        organization_id: user.organization_id,
       };
 
       const response = await createChat(data);

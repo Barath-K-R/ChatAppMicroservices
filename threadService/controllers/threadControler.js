@@ -14,7 +14,6 @@ const threadController = (app) => {
     }
   });
 
-
   app.post("/message", async (req, res) => {
     try {
       const { thread_id, sender_id, message, chatId } = req.body;
@@ -25,7 +24,6 @@ const threadController = (app) => {
       return res.status(500).json({ error: "Failed to add message to thread." });
     }
   });
-
 
   app.post("/:threadId", async (req, res) => {
     const { threadId } = req.params
@@ -49,6 +47,7 @@ const threadController = (app) => {
       return res.status(500).json({ error: "Failed to fetch thread members." });
     }
   });
+
   app.post("/:threadId/members", async (req, res) => {
     const { threadId } = req.params; 
     const { userIds } = req.body;    
@@ -65,6 +64,17 @@ const threadController = (app) => {
     } catch (error) {
       console.error("Error in addMembersToThread controller:", error);
       return res.status(500).json({ error: "Failed to add members to thread." });
+    }
+  });
+
+  app.get("/user/:userId", async (req, res) => {
+    const { userId } = req.params;
+    try {
+      const response = await threadService.getThreadsByUser(userId);
+      return res.status(200).json(response);
+    } catch (error) {
+      console.error("Error in getThreadsByUser controller:", error);
+      return res.status(500).json({ error: "Failed to fetch threads for user." });
     }
   });
 };

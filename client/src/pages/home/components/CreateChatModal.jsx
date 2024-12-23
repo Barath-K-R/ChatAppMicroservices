@@ -49,4 +49,4 @@ const CreateChatModal = ({
   );
 };
 
-export default CreateChatModal;
+export default React.memo(CreateChatModal);

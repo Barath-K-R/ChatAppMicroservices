@@ -122,6 +122,28 @@ export const deleteMessages = async (chatId) => {
   }
 };
 
+export const updateMessagesForGroupConversion = async (oldChatId, newChatId) => {
+  try {
+    const [updatedCount] = await MessageModel.update(
+      {
+        chat_id: newChatId,     
+        thread_id: null,         
+        is_thread_head: false,   
+      },
+      {
+        where: {
+          chat_id: oldChatId, 
+        },
+      }
+    );
+
+    return updatedCount; 
+  } catch (error) {
+    console.error("Error updating messages for group conversion:", error);
+    throw new Error("Failed to update messages for group conversion.");
+  }
+};
+
 export const findReactionsByMessageId = async (messageId) => {
   try {
     const reactions = await MessageReactionModel.findAll({

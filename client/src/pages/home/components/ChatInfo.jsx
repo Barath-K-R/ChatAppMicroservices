@@ -210,7 +210,7 @@ const ChatInfo = ({ currentChat, setMessages, setChats, setchatInfoModalOpened }
               <BsThreeDotsVertical size={15} />
             </div>
             {isModalOpened && (
-              <div className="settings-modal absolute top-[65px] right-52 w-28 p-2 bg-white border shadow-lg rounded-md">
+              <div className="settings-modal absolute top-[65px] right-52 w-32 p-2 bg-white border shadow-lg rounded-md">
                 <ul>
                   <li
                     className="py-1 px-2 text-red-500 hover:bg-gray-100 cursor-pointer"

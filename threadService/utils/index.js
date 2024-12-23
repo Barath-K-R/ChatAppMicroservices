@@ -34,6 +34,8 @@ export const createChannel = async () => {
         await channel.assertExchange(process.env.EXCHANGE_NAME, "direct", { durable: true });
         
         await channel.assertQueue('fetch_thread_members_queue', { durable: true });
+        await channel.assertQueue('delete_thread_queue', { durable: true });
+        await channel.bindQueue('delete_thread_queue', process.env.EXCHANGE_NAME, 'delete_thread');
         await channel.bindQueue('fetch_thread_members_queue', process.env.EXCHANGE_NAME, 'fetch_thread_members');
         return channel;
 
@@ -76,7 +78,17 @@ export const SubscribeMessage = async () => {
         'fetch_thread_members_queue',
         (msg) => {
             if (msg && msg.content) {
-                subscribeEvents(msg); 
+                subscribeEvents(msg,"fetch_thread_members"); 
+            }
+        },
+        { noAck: false } 
+    );
+
+    channel.consume(
+        'delete_thread_queue',
+        (msg) => {
+            if (msg && msg.content) {
+                subscribeEvents(msg,"delete_thread"); 
             }
         },
         { noAck: false } 

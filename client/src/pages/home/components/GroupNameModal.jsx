@@ -27,6 +27,7 @@ const GroupNameModal = ({ selectedThreadId, setSelectedThreadId }) => {
     };
     console.log(newGroupData)
     try {
+      console.log(selectedThreadId)
       const newGroup = await convertThreadToGroup(selectedThreadId, newGroupData);
       setSelectedThreadId(null);
       dispatch({type:"SET_CURRENT_CHAT",payload:newGroup.data})
