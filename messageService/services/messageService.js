@@ -234,7 +234,6 @@ export const addReaction = async (messageId, userId, reaction) => {
   }
 };
 
-
 export const removeReaction = async (messageId, reactionId) => {
   try {
     if (!messageId || !reactionId) {
