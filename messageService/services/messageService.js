@@ -1,6 +1,7 @@
 import * as messageRepository from "../database/repositories/messageRepository.js";
 import * as readreceiptsRepository from "../database/repositories/readReceiptRepository.js";
 import { publishMessage, createChannel } from "../utils/index.js";
+import axios from 'axios'
 import crypto from 'crypto'
 import dotenv from 'dotenv'
 
@@ -17,6 +18,18 @@ export const addingMessage = async (chatId, sender_id, message, thread_id = null
   } catch (error) {
     console.error("Error adding message:", error);
     throw new Error("Failed to add message.");
+  }
+};
+
+export const getMessageById = async (messageId) => {
+  try {
+    const message = await messageRepository.getMessageById(messageId);
+    if (!message) {
+      throw new Error("Message not found");
+    }
+    return message;
+  } catch (error) {
+    throw new Error("Error fetching message: " + error.message);
   }
 };
 
@@ -46,40 +59,9 @@ export const getChatMessages = async (chatId) => {
 
     const combinedUserIds = [...new Set([...allUserIds, ...forwardedMessageUserIds])];
 
-    const channel = await createChannel();
-    const responseQueue = await channel.assertQueue('', { exclusive: true });
-    const correlationId = crypto.randomUUID();
-
-    const responsePromise = new Promise((resolve, reject) => {
-      channel.consume(
-        responseQueue.queue,
-        (msg) => {
-          if (msg.properties.correlationId === correlationId) {
-            const data = JSON.parse(msg.content.toString());
-            resolve(data);
-            channel.ack(msg);
-          }
-        },
-        { noAck: false }
-      );
-
-      setTimeout(() => reject(new Error('Timeout waiting for user details')), 10000);
-    });
-
-
-    channel.publish(
-      process.env.EXCHANGE_NAME,
-      'fetch_user_details',
-      Buffer.from(JSON.stringify(combinedUserIds)),
-      {
-        replyTo: responseQueue.queue,
-        correlationId,
-      }
-    );
-
-
-    const userDetails = await responsePromise;
-
+    
+    let userDetails =await fetchUserDetails(combinedUserIds)
+    
     const messagesWithUserDetails = messages.map((message) => {
       const messageUserDetail = userDetails.find((user) => user.id === message.dataValues.sender_id);
       const forwardedMessage = forwardedMessages.find(
@@ -162,37 +144,7 @@ export const getReactions = async (messageId) => {
 
     const userIds = reactions.map((reaction) => reaction.userId);
 
-    const channel = await createChannel();
-
-    const responseQueue = await channel.assertQueue('', { exclusive: true });
-    const correlationId = crypto.randomUUID();
-
-    const responsePromise = new Promise((resolve, reject) => {
-      channel.consume(
-        responseQueue.queue,
-        (msg) => {
-          if (msg.properties.correlationId === correlationId) {
-            const data = JSON.parse(msg.content.toString());
-            resolve(data);
-            channel.ack(msg);
-          }
-        },
-        { noAck: false }
-      );
-
-      setTimeout(() => reject(new Error('Timeout waiting for user details')), 10000);
-    });
-    channel.publish(
-      process.env.EXCHANGE_NAME,
-      'fetch_user_details',
-      Buffer.from(JSON.stringify(userIds)),
-      {
-        replyTo: responseQueue.queue,
-        correlationId,
-      }
-    );
-
-    const userDetails = await responsePromise;
+    let userDetails =await fetchUserDetails(userIds)
 
     const reactionsWithUserDetails = reactions.map((reaction) => {
       const userDetail = userDetails.find(user => user.id === reaction.userId);
@@ -282,6 +234,23 @@ export const updateReadReceipts = async (messageIds, userId, date) => {
   } catch (error) {
     console.error("Failed to update read receipts:", error);
     throw new Error("Failed to update read receipts");
+  }
+};
+
+export const fetchUserDetails = async (userIds) => {
+  try {
+    const response = await axios.post('http://localhost:8000/users/ids', {
+      userIds: userIds,
+    });
+
+    if (response.status === 200) {
+      return response.data; 
+    } else {
+      throw new Error(`Failed to fetch user details, status code: ${response.status}`);
+    }
+  } catch (error) {
+    console.error('Error fetching user details:', error);
+    throw new Error('Failed to fetch user details');
   }
 };
 

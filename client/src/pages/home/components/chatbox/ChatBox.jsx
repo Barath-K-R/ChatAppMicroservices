@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef,Suspense } from "react";
 import { CiUser } from "react-icons/ci";
 import { BiMessageAltAdd } from "react-icons/bi";
 import { CgLaptop, CgMailReply } from "react-icons/cg";
@@ -11,23 +11,27 @@ import { v4 as uuidv4 } from "uuid";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
-import Message from "./Message.jsx";
-import MembersList from "./MembersList.jsx";
-import ChatSettings from "./ChatSettings.jsx";
-import ChatInfo from "./ChatInfo.jsx";
-import ForwardMessageModal from "./ForwardMessageModal.jsx";
-import PinMessageModal from "./PinMessageModal.jsx";
+import Message from "../Message.jsx";
+import MembersList from "../MembersList.jsx";
+import ChatSettings from "../ChatSettings.jsx";
+import ChatInfo from "../ChatInfo.jsx";
+
+import PinMessageModal from "../PinMessageModal.jsx";
 
 
 import {
   retrieveMembers,
   getAllRolePermissions
-} from "../../../api/ChatApi.js";
-import { getMessages, addMessage, createReadReciept, updateReadReciepts } from '../../../api/messageApi.js'
-import { addMessageToThread, createThread, getThreadMembers, addMembersToThread, getThreadByUser } from "../../../api/threadApi.js";
-import GroupNameModal from "./GroupNameModal.jsx";
+} from "../../../../api/ChatApi.js";
+import { getMessages, addMessage, createReadReciept, updateReadReciepts } from '../../../../api/messageApi.js'
+import { addMessageToThread, createThread, getThreadMembers, addMembersToThread, getThreadByUser } from "../../../../api/threadApi.js";
+import GroupNameModal from "../GroupNameModal.jsx";
+import ChatBoxHeader from "./ChatBoxHeader.jsx";
+
+
+const ForwardMessageModal = React.lazy(() => import('../ForwardMessageModal.jsx'));
+
 const ChatBox = ({
-  chat,
   chats,
   socket,
   setChats,
@@ -244,13 +248,13 @@ const ChatBox = ({
 
   //fetching all threads of currentuser
   useEffect(() => {
-    const fetchAllThreadsOfUser=async()=>{
-      const threads=await getThreadByUser(currentUser.id);
-      userThreads.current=threads.data.map(thread=>thread.thread_id);
+    const fetchAllThreadsOfUser = async () => {
+      const threads = await getThreadByUser(currentUser.id);
+      userThreads.current = threads.data.map(thread => thread.thread_id);
     }
     fetchAllThreadsOfUser();
   }, [currentChat])
-  
+
 
   //handling sent messages
   const handleSend = async (e) => {
@@ -416,10 +420,10 @@ const ChatBox = ({
 
   const handleReplyThread = async (threadId) => {
     try {
- 
+
       if (!userThreads.current.includes(threadId)) {
-        userThreads.current.push(threadId); 
-  
+        userThreads.current.push(threadId);
+
         const response = await addMembersToThread(threadId, [currentUser.id]);
         console.log("User added to thread successfully:", response);
       }
@@ -432,7 +436,7 @@ const ChatBox = ({
     <div className="flex flex-col relative h-screen w-full bg-slate-100 z-0">
       {/* Chat header */}
       <div className="flex relative items-center justify-between h-12 border border-solid border-gray-500 shadow-sm bg-white p-4 px-6 gap-6 z-50">
-        <section className="flex items-center gap-6">
+        {/* <section className="flex items-center gap-6">
           <div className="flex justify-start items-center max-w-max h-10 cursor-pointer">
             <h1 className="font-semibold text-xl ">
               {currentChat?.Chat?.name ? currentChat.Chat?.name : currentChat?.User?.username}
@@ -461,7 +465,8 @@ const ChatBox = ({
             setchatSettingsOpened={setchatSettingsOpened}
             setchatInfoModalOpened={setchatInfoModalOpened}
           />
-        )}
+        )} */}
+        <ChatBoxHeader setmembersListModalOpened={setmembersListModalOpened} setchatSettingsOpened={setchatSettingsOpened} chatSettingsOpened={chatSettingsOpened}/>
       </div>
 
       {/* pinned messages modal */}
@@ -564,7 +569,7 @@ const ChatBox = ({
                     />
                     <button
                       className="h-7 w-14 bg-blue-500 hover:bg-blue-600 rounded-md"
-                      onClick={()=>{
+                      onClick={() => {
                         handleSend()
                         handleReplyThread(message?.thread_id)
                       }}
@@ -586,7 +591,7 @@ const ChatBox = ({
                       <CgMailReply
                         size={17}
                         className="hover:text-blue-400 cursor-pointer"
-                        onClick={()=>setreplyThread("old")}
+                        onClick={() => setreplyThread("old")}
                       />
                       <BiMessageAltAdd className="hover:text-blue-400 cursor-pointer" onClick={() => setSelectedThreadId(message?.thread_id)} />
                     </section>
@@ -599,7 +604,11 @@ const ChatBox = ({
         })}
         {/* Scroll to bottom reference */}
         <div ref={messagesEndRef} />
-        {isForwardMessageModalOpened && <ForwardMessageModal chats={chats} />}
+        {isForwardMessageModalOpened && (
+          <Suspense fallback={<div>Loading...</div>}>
+            <ForwardMessageModal chats={chats} />
+          </Suspense>
+        )}
       </div>
 
       {/* Fixed message input */}

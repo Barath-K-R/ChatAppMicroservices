@@ -1,6 +1,6 @@
 import * as threadRepository from '../database/repositories/threadRepository.js';
 import { publishMessage, createChannel } from '../utils/index.js';
-
+import axios from 'axios'
 export const createThread = async (chatId, sender_id, head, userIds, message) => {
     if (!chatId) {
         throw new Error("chatId is required.");
@@ -9,42 +9,16 @@ export const createThread = async (chatId, sender_id, head, userIds, message) =>
     let messageExists = true;
 
     if (head) {
-        const channel = await createChannel();
-        const responseQueue = await channel.assertQueue("", { exclusive: true });
-        const correlationId = generateUuid();
-
-        channel.consume(
-            responseQueue.queue,
-            (msg) => {
-                if (msg.properties.correlationId === correlationId) {
-                    messageExists = JSON.parse(msg.content.toString());
-                }
-            },
-            { noAck: true }
-        );
-
-        // Publish the message find request
-        channel.publish(
-            process.env.EXCHANGE_NAME,
-            "message_find",
-            Buffer.from(JSON.stringify({ messageId: head })),
-            {
-                replyTo: responseQueue.queue,
-                correlationId,
+        try {
+           
+            const response = await axios.get(`http://localhost:8000/messages/${head}`);
+            if (response.status === 200) {
+                messageExists = response.data ? true : false; 
             }
-        );
-
-        // Wait for the response or timeout
-        await new Promise((resolve, reject) => {
-            const timeout = setTimeout(() => reject(new Error("Timeout waiting for message find response")), 10000);
-            const interval = setInterval(() => {
-                if (messageExists !== true) {
-                    clearTimeout(timeout);
-                    clearInterval(interval);
-                    resolve();
-                }
-            }, 100);
-        });
+        } catch (error) {
+            console.error("Error fetching message:", error);
+            messageExists = false; 
+        }
 
         if (!messageExists) {
             throw new Error("Head message not found.");
@@ -179,7 +153,6 @@ export const subscribeEvents = async (msg, event) => {
         channel.nack(msg, false, true); 
     }
 };
-
 
 const generateUuid = () => {
     return (

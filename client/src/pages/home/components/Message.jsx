@@ -43,6 +43,7 @@ const Message = ({
   };
 
   const convertDate = (dateStr) => {
+    console.log(dateStr)
     const date = new Date(dateStr);
   
     const month = new Intl.DateTimeFormat('en-US', { month: 'short' }).format(date);

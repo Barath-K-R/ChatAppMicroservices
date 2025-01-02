@@ -1,7 +1,7 @@
 import jwt from 'jsonwebtoken';
 import * as userRepository from '../datasbase/repositories/userRepository.js';
 import { publishMessage, createChannel } from '../utils/index.js';
-
+import axios from 'axios'
 export const addUser = async ({ username, email, password }) => {
   try {
     const newUser = await userRepository.createUser({ username, email, password });
@@ -50,49 +50,18 @@ export const joinOrganization = async (userId, orgName) => {
       throw { status: 400, message: "Invalid input: orgName and userId are required" };
     }
     let organization;
-
+  
     try {
-      const channel = await createChannel();
-      const responseQueue = await channel.assertQueue("", { exclusive: true });
-      const correlationId = generateUuid();
+      const response = await axios.get(`http://localhost:8000/organization/${orgName}`);
 
-      channel.consume(
-        responseQueue.queue,
-        (msg) => {
-          if (msg.properties.correlationId === correlationId) {
-            organization = JSON.parse(msg.content.toString());
-          }
-        },
-        { noAck: true }
-      );
-
-      channel.publish(
-        process.env.EXCHANGE_NAME,
-        "fetch_organization",
-        Buffer.from(JSON.stringify({ orgName })),
-        {
-          replyTo: responseQueue.queue,
-          correlationId,
-        }
-      );
-
-      await new Promise((resolve, reject) => {
-        const timeout = setTimeout(() => reject(new Error("Timeout waiting for organization details")), 10000);
-        const interval = setInterval(() => {
-          if (organization) {
-            clearTimeout(timeout);
-            clearInterval(interval);
-            resolve();
-          }
-        }, 100);
-      });
-      console.log(organization);
-      if (!organization || organization.error) {
-        throw { status: 404, message: organization?.error || "Organization not found" };
+      if (response.status === 200 && response.data.organization) {
+        organization = response.data.organization;
+      } else {
+        throw { status: 404, message: "Organization not found" };
       }
     } catch (error) {
       console.log(error);
-      throw { status: 500, message: "Error fetching organization details via RabbitMQ" };
+      throw { status: 500, message: "Error fetching organization details" };
     }
 
     const user = await userRepository.findByUserId(userId);
@@ -102,8 +71,8 @@ export const joinOrganization = async (userId, orgName) => {
 
     await userRepository.updateUserOrganization(userId, organization.id)
 
-    const updatedUser = await userRepository.findByUserId(userId); 
-    
+    const updatedUser = await userRepository.findByUserId(userId);
+
     return updatedUser;
 
   } catch (error) {

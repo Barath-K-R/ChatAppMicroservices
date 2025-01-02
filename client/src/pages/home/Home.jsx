@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect } from "react";
 
 import Conversations from "../../components/Conversations.jsx";
-import ChatBox from "./components/ChatBox.jsx";
+import ChatBox from "./components/chatbox/ChatBox.jsx";
 import UserSearchModal from "./components/UserSearchModal.jsx";
 import CreateChatModal from "./components/CreateChatModal.jsx";
 import CreateChannelModal from "./components/CreateChannelModal.jsx";
@@ -11,7 +11,7 @@ import { getAllUserChats } from "../../api/ChatApi.js";
 import { io } from "socket.io-client";
 import { useSocket } from "../../context/SocketContext.js";
 
-import { userChats, createChat,getAllRoles } from "../../api/ChatApi.js";
+import { getChatsByChatType, createChat,getAllRoles } from "../../api/ChatApi.js";
 import { useSelector,useDispatch } from "react-redux";
 import { AiOutlinePlus } from "react-icons/ai";
 
@@ -45,7 +45,7 @@ const Home = () => {
   useEffect(() => {
     const getChats = async () => {
       try {
-        const response = await userChats(user.id, chatType);
+        const response = await getChatsByChatType(user.id, chatType);
 
         setChats(response.data);
       } catch (error) {
@@ -88,7 +88,7 @@ const Home = () => {
       setReceivedMessage(data);
     });
 
-    const fetchAllUsers=async()=>{
+    const fetchAllUserChats=async()=>{
       try {
         const userChats=await getAllUserChats(user.id)
   
@@ -98,7 +98,7 @@ const Home = () => {
       }
     }
 
-    fetchAllUsers();
+    fetchAllUserChats();
   }, []);
 
   //fetching all roles
@@ -203,7 +203,6 @@ const Home = () => {
       </div>
       {currentChat && (
         <ChatBox
-          chat={currentChat}
           chats={chats}
           socket={socket}
           setChats={setChats}

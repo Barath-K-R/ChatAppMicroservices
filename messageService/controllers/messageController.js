@@ -1,6 +1,8 @@
 import * as messageService from "../services/messageService.js";
+import authenticateToken from "../middlewares/authMiddleware.js";
 
 export const messageController = (app) => {
+
 
   app.post("/", async (req, res) => {
     console.log(req.body);
@@ -13,7 +15,17 @@ export const messageController = (app) => {
     }
   });
 
-  app.get("/:chatId", async (req, res) => {
+  app.get("/:messageId", async (req, res) => {
+    try {
+      const { messageId } = req.params;
+      const result = await messageService.getMessageById(messageId);
+      res.status(200).send(result);
+    } catch (error) {
+      res.status(404).json({ error: "Message not found" });
+    }
+  });
+
+  app.get("/chat/:chatId", async (req, res) => {
     try {
       const { chatId } = req.params;
       const result = await messageService.getChatMessages(chatId);
@@ -23,7 +35,7 @@ export const messageController = (app) => {
     }
   });
 
-  app.delete("/:chatId", async (req, res) => {
+  app.delete("/chat/:chatId", async (req, res) => {
     try {
       const { chatId } = req.params;
       const result = await messageService.deleteChatMessages(chatId);
@@ -65,7 +77,7 @@ export const messageController = (app) => {
     }
   });
 
-  app.get("/:chatId/unseen", async (req, res) => {
+  app.get("/chat/:chatId/unseen", async (req, res) => {
     try {
       const { chatId } = req.params;
       const { userId } = req.query;

@@ -58,7 +58,8 @@ const MessageActionModal = ({
   };
 
   const handleEmojiReactionClick = async (emojiData) => {
-    const selectedReaction = emojiData.emoji;
+    console.log('emoji='+emojiData)
+    const selectedReaction = emojiData;
 
     setEmojiPickerOpen(false)
 
@@ -82,6 +83,7 @@ const MessageActionModal = ({
     setNewReactionData({ messageId: message.id, reaction: selectedReaction, userId: currentUser.id, username: currentUser.username, recipients: recipientsIds });
     try {
       console.log(message.id + ' ' + selectedReaction + ' ' + currentUser.id)
+      console.log(selectedReaction)
       await updateReactions(message.id, selectedReaction, currentUser.id);
       updatePopularEmojis(selectedReaction);
     } catch (error) {

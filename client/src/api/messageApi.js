@@ -3,10 +3,10 @@ import axios from 'axios'
 const messageApi = axios.create({ baseURL: "http://localhost:8000/messages" });
 
 export const addMessage = (message) => messageApi.post("/", message);
-export const getMessages = (id) => messageApi.get(`/${id}`);
+export const getMessages = (id) => messageApi.get(`/chat/${id}`);
 export const unseenMessageCount = (chatId, userId) =>
-  messageApi.get(`/${chatId}/unseen?userId=${userId}`);
-export const deleteMessages = (chatId) => messageApi.delete(`/${chatId}`);
+  messageApi.get(`/chat/${chatId}/unseen?userId=${userId}`);
+export const deleteMessages = (chatId) => messageApi.delete(`/chat/${chatId}`);
 
 export const createReadReciept = (userIds, messageId) =>
   messageApi.post(`/read-receipts/${messageId}`, userIds);

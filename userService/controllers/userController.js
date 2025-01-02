@@ -3,7 +3,7 @@ import * as userService from "../services/userService.js";
 
 const UserController = (app) => {
 
-  app.get("/ids", async (req, res) => {
+  app.post("/ids", async (req, res) => {
     console.log('finding userids');
     const { userIds } = req.body;
     try {

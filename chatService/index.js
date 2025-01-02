@@ -9,12 +9,14 @@ import RoleModel from "./database/models/roleModel.js";
 import PermissionModel from "./database/models/permissionModel.js";
 import ChatPermissionModel from "./database/models/chatPermissionsModel.js";
 
-
-
+import chatController from './controllers/chatController.js';
+import chatMemberController from './controllers/chatMemberController.js';
+import chatPermissionController from './controllers/chatPermissionController.js';
+import roleController from './controllers/roleController.js';
 
 import { setupAssociations } from "./database/models/association.js";
 
-import chatController from "./controllers/chatController.js";
+
 
 dotenv.config();
 
@@ -35,7 +37,11 @@ app.use(express.urlencoded({ extended: true }));
 
         setupAssociations();
 
+        roleController(app);
         chatController(app);
+        chatMemberController(app);
+        chatPermissionController(app);
+        
 
         const PORT = process.env.PORT || 7000;
         app.listen(PORT, () => {
